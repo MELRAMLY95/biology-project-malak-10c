@@ -86,7 +86,7 @@ button { font-family: inherit; cursor: pointer; }
 .panel {
   position: fixed; z-index: 6; left: 120px; right: 40px; top: 110px; bottom: 28px;
   max-width: 820px; overflow: auto; padding: 28px 32px;
-  background: rgba(6,10,9,.78); border: 1px solid rgba(212,180,138,.22);
+  background: rgba(5,8,7,.94); border: 1px solid rgba(212,180,138,.22);
   pointer-events: auto;
 }
 .panel.quiz {
@@ -107,7 +107,7 @@ button { font-family: inherit; cursor: pointer; }
   overflow: auto;
   padding: 18px 12px 18px 14px;
   border-right: 1px solid rgba(212,180,138,.16);
-  background: rgba(4,8,7,.35);
+  background: rgba(4,8,7,.55);
 }
 .learnRail button {
   display: flex; gap: 10px; align-items: baseline; width: 100%;
@@ -118,8 +118,30 @@ button { font-family: inherit; cursor: pointer; }
 .learnRail button span { font-family: var(--mono); font-size: 10px; color: var(--amber); min-width: 1.8em; }
 .learnRail button.on, .learnRail button:hover { color: var(--ink); border-left-color: var(--amber); background: rgba(212,180,138,.06); }
 .learnStage { padding: 28px 40px 22px; overflow: auto; display: flex; flex-direction: column; }
-.learnHead { margin-bottom: 6px; }
-.learnHead .bar { margin: 10px 0 4px; }
+#titlecard .by {
+  font-family: var(--sans); font-size: 22px; font-weight: 600;
+  color: var(--amber); margin: 14px 0 0; letter-spacing: .02em;
+  text-transform: none;
+}
+.name, #credit {
+  font-family: var(--sans); font-weight: 600; font-size: 13px;
+  letter-spacing: .03em; text-transform: none; color: var(--amber); margin: 0;
+}
+#rail .name { font-size: 11px; margin: 0 0 10px; }
+.s2 {
+  font-family: var(--sans); font-weight: 700; letter-spacing: .06em;
+  text-transform: none; font-variant: normal;
+}
+.learnHead {
+  display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 16px;
+  margin-bottom: 6px;
+}
+.learnHead .bar { grid-column: 1 / -1; margin: 10px 0 4px; }
+#credit {
+  position: fixed; z-index: 5; left: 18px; bottom: 16px;
+  pointer-events: none; opacity: .92; font-size: 13px;
+}
+body[data-scene="intro"] #credit { display: none; }
 #learnPad h2 {
   font-size: clamp(34px, 4.6vw, 58px);
   margin: 10px 0 18px;
@@ -161,7 +183,10 @@ button { font-family: inherit; cursor: pointer; }
 }
 .quizActions { margin-top: auto; padding-top: 12px; }
 #quizFb { flex: 0 0 auto; }
-.panel.slim { top: auto; bottom: 24px; left: 120px; right: auto; width: 280px; height: auto; }
+.panel.slim {
+  left: auto; right: 24px; top: 90px; bottom: auto; width: 260px; height: auto;
+  z-index: 8; background: rgba(5,8,7,.96);
+}
 .panel h2 { font-family: var(--serif); font-weight: 500; font-size: 32px; margin: 8px 0 14px; line-height: 1.2; }
 .panel p { color: var(--mute); line-height: 1.55; font-size: 16px; }
 .panel .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }

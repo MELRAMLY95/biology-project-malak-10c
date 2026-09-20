@@ -16,8 +16,9 @@ export function setScene(id) {
   inspect = false;
   $("#btnInspect")?.classList.remove("on");
   hideCallout();
-  NB.key = id === "plant" ? "plant" : id === "bacteria" ? "bac" : id === "transgenic" ? "tg" : id === "dolly" ? "dolly" : id === "ethics" ? "ethics" : "scnt";
+  NB.key = id === "plant" ? "plant" : id === "bacteria" ? "bac" : id === "transgenic" ? "tg" : id === "dolly" ? "dolly" : id === "ethics" ? "ethics" : id === "define" ? "define" : "scnt";
   NB.render();
+  if (id === "define") Define.reset(false);
   if (id === "scnt") SCNT.reset(false);
   if (id === "dolly") Dolly.reset(false);
   if (id === "plant") Plant.reset(false);
@@ -54,13 +55,13 @@ function clearSim() {
 
 function hudFor(id) {
   const map = {
-    define: ["Definition", "What is a clone?", "Drag the nucleus into the empty cell. Same nuclear DNA, copied by mitosis."],
+    define: ["Definition", "What is a clone?", "Copy nuclear DNA by mitosis. Same genes ≠ same phenotype. Then identify the clone."],
     learn: ["Curriculum", "Edexcel 4BI1 cloning", "Read, then try the lab, then answer."],
     quiz: ["Quiz", "Check your understanding", "Choose A–D, then submit."],
     exam: ["Exam pad", "Use mark-scheme language", "Nuclear DNA · mitosis · enucleated egg · surrogate."],
     glossary: ["Glossary", "Terms from the specification", "Select a word for a short definition."],
     scnt: ["SCNT laboratory", "Micromanipulation · 5.19B", "Aspirate somatic nucleus → enucleate egg → transfer → pulse (mitosis, not new DNA) → implant."],
-    dolly: ["Roslin 1996", "Repeat Dolly’s protocol", "Finn-Dorset nucleus. Blackface egg and surrogate. Clone matches the nuclear donor."],
+    dolly: ["Roslin 1996", "Repeat Dolly’s protocol", "G0 mammary nucleus from Finn-Dorset. Enucleated Blackface egg. Pulse starts mitosis. Match the barcode."],
     plant: ["Tissue culture", "Produce identical plants", "Explant → sterilise → culture → plantlets → greenhouse."],
     bacteria: ["Bacterial world", "A clonal population from one cell", "Binary fission: replicate DNA → elongate → septum → two clones. Temperature and nutrients set the rate."],
     transgenic: ["Genetic engineering", "Human insulin in a host", "Select insulin (not a decoy gene). Insert. Clone. Collect the protein."],
@@ -128,10 +129,20 @@ function dockFor(id) {
     bindTgDock();
   } else if (id === "dolly") {
     d.innerHTML = `
-      <p id="dStep" style="color:var(--mute);font-size:12px;line-height:1.4">Step 1 · mammary cell from the Finn-Dorset</p>
-      <button type="button" class="pulse" id="dPulse" disabled><i></i>Hold electric pulse</button>
-      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">The pulse starts mitosis. It does not write DNA. Dolly’s nuclear DNA will match the mammary donor.</p>`;
+      <p id="dStep" style="color:var(--mute);font-size:12px;line-height:1.45">1 / 9  ·  Click the cream-faced Finn-Dorset for a mammary cell.</p>
+      <button type="button" class="pulse" id="dStarve" disabled><i></i>Hold serum-starve (G0)</button>
+      <button type="button" class="pulse" id="dPulse" disabled><i></i>Hold electric pulse</button>`;
     bindDollyDock();
+  } else if (id === "define") {
+    d.innerHTML = `
+      <p id="defStep" style="color:var(--mute);font-size:12px;line-height:1.45">1 / 5  ·  Replicate the parent’s nuclear DNA. Do not empty the parent.</p>
+      <button type="button" id="defRep">Replicate nuclear DNA</button>
+      <button type="button" id="defMito" disabled>Run mitosis</button>
+      <label>Clone B light <input id="defLight" type="range" min="8" max="100" value="82" disabled /></label>
+      <label>Clone B nutrients <input id="defFood" type="range" min="8" max="100" value="78" disabled /></label>
+      <button type="button" id="defStill" disabled>Still clones?</button>
+      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">A clone matches nuclear DNA. Mixing sperm and egg is sexual reproduction — not cloning.</p>`;
+    bindDefDock();
   } else if (id === "ethics" || id === "exam" || id === "quiz" || id === "learn" || id === "glossary") {
     d.innerHTML = "";
   } else if (id === "master") {
@@ -148,11 +159,11 @@ function dockFor(id) {
 export function hint() {
   const h = {
     scnt: "Grab the glass pipette or click a nucleus to aim. Green ring = aligned — release to aspirate. Enucleate the egg before you seat the donor. Hold activate. Implant at blastocyst.",
-    dolly: "Click the cream Finn-Dorset for a mammary cell, then the dark-faced ewe for an egg. Drag the violet egg nucleus to the red X. Seat the donor nucleus, fuse in the tube, pulse, implant, then click who Dolly matches.",
+    dolly: "Click Finn-Dorset → serum-starve the mammary cell (G0) → Blackface egg → discard egg nucleus → seat donor nucleus → electrodes → pulse (mitosis, not new DNA) → wait for cleavage → implant → match the barcode.",
     plant: "Click the shoot, cut, sterilise, drag the explant into the vessel.",
     bacteria: "Press Culture. DNA copies, the cell elongates, a septum splits it. Cold or starvation slows fission. Click to switch microscope and colony.",
     transgenic: "Click the gold insulin gene — not haemoglobin or keratin. Carry it into the bacterium, then clone the host.",
-    define: "Same nuclear DNA. Copied by mitosis. Phenotype can still change.",
+    define: "Replicate, then seat the sister nucleus. Mitosis copies DNA — gametes mix it. Change Clone B’s environment, then pick who matches the parent barcode.",
     ethics: "There is no single correct click. Pick a stance, then steal exam language from both columns."
   };
   toast(h[scene] || "Explore the environment.", "");
@@ -161,16 +172,18 @@ export function hint() {
 export function procedure() {
   const p = {
     scnt: "1 Somatic nucleus  2 Enucleate egg  3 Transfer  4 Activate  5 Implant in surrogate",
-    dolly: "Mammary cell of Finn-Dorset → enucleated Blackface egg → pulse → Blackface surrogate",
+    dolly: "Finn-Dorset mammary (G0) → enucleated Blackface egg → pulse / mitosis → Blackface surrogate. Nuclear DNA = donor.",
     plant: "Explant → surface sterilise → nutrient medium → plantlets → acclimatise",
     bacteria: "DNA replicates → cell elongates → septum → two clones",
     transgenic: "Identify human insulin gene → introduce into host genome → clone the host → insulin from the culture",
-    ethics: "Name an advantage, a disadvantage, and who pays the cost. Never claim the pulse creates DNA."
+    ethics: "Name an advantage, a disadvantage, and who pays the cost. Never claim the pulse creates DNA.",
+    define: "1 Replicate nuclear DNA  2 Seat the sister nucleus  3 Mitosis  4 Change environment  5 Click the matching barcode"
   };
   toast(p[scene] || "No procedure sheet on this bench.", "");
 }
 
 export function resetActive() {
+  if (scene === "define") Define.reset(true);
   if (scene === "scnt") SCNT.reset(true);
   if (scene === "dolly") Dolly.reset(true);
   if (scene === "plant") Plant.reset(true);
@@ -188,47 +201,435 @@ function status(s, acc) {
 function acc(m) { return Math.max(0, 100 - m * 8); }
 
 /* ---------- DEFINE ---------- */
+const BASES = ["#6ec4a0", "#e0b060", "#8eb4e0", "#c07ab0"];
+const PARENT_SEQ = [0, 1, 2, 0, 1, 2, 3, 1];
+const SEX_SEQ = [0, 1, 2, 3, 3, 0, 3, 2];
+const UNREL_SEQ = [3, 2, 3, 0, 2, 3, 1, 0];
+
 const Define = {
-  nuc: { x: 0, y: 0, grab: false, done: false },
-  tick() {
+  state: "idle",
+  mistakes: 0,
+  mito: 0,
+  grow: 0,
+  light: 82,
+  food: 78,
+  tweaked: false,
+  grab: null,
+  order: [0, 1, 2],
+  _hud: "",
+  layout() {
     const w = innerWidth, h = innerHeight;
+    return {
+      w, h,
+      P: { x: w * 0.30, y: h * 0.46, r: 86 },
+      C: { x: w * 0.62, y: h * 0.46, r: 86 },
+      sperm: { x: w * 0.42, y: h * 0.72, r: 22 },
+      egg: { x: w * 0.54, y: h * 0.72, r: 28 }
+    };
+  },
+  reset(log) {
+    const L = this.layout();
+    this.state = "idle";
+    this.mistakes = 0;
+    this.mito = 0;
+    this.grow = 0;
+    this.light = 82;
+    this.food = 78;
+    this.tweaked = false;
+    this.grab = null;
+    this.seated = false;
+    this.replicated = false;
+    this._hud = "";
+    this.nuc = { x: L.P.x - 6, y: L.P.y - 5 };
+    this.sis = null;
+    this.gamS = { x: L.sperm.x, y: L.sperm.y, kind: "sperm" };
+    this.gamE = { x: L.egg.x, y: L.egg.y, kind: "egg" };
+    this.order = [0, 1, 2];
+    for (let i = this.order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.order[i], this.order[j]] = [this.order[j], this.order[i]];
+    }
+    const r = $("#defRep"); if (r) r.disabled = false;
+    const m = $("#defMito"); if (m) m.disabled = true;
+    const s = $("#defStill"); if (s) s.disabled = true;
+    const li = $("#defLight"); if (li) { li.disabled = true; li.value = 82; }
+    const f = $("#defFood"); if (f) { f.disabled = true; f.value = 78; }
+    if (log) NB.add("define", "Definition bench reset.");
+  },
+  steps() {
+    return {
+      idle: "1 / 5  ·  Replicate the parent’s nuclear DNA. Cloning does not empty the parent.",
+      drag: "2 / 5  ·  Drag the sister nucleus into the empty cell — not a gamete.",
+      copy: "3 / 5  ·  Run mitosis. Every nucleus must match the parent barcode.",
+      mito: "Mitosis in progress — DNA is copied, not rewritten.",
+      env: "4 / 5  ·  Starve or shade Clone B. Phenotype can change. Nuclear DNA does not.",
+      who: "5 / 5  ·  Click the organism whose nuclear barcode matches the parent.",
+      done: "Clone = same nuclear DNA, copied by mitosis. Same genes ≠ same phenotype."
+    };
+  },
+  fail(m) {
+    this.mistakes++;
+    audio.bad();
+    toast(m, "warn");
+    NB.add("define", "Error: " + m);
+    sim.classList.remove("shake");
+    void sim.offsetWidth;
+    sim.classList.add("shake");
+  },
+  replicate() {
+    if (this.state !== "idle") return;
+    const L = this.layout();
+    this.replicated = true;
+    this.sis = { x: L.P.x + 58, y: L.P.y - 42 };
+    this.state = "drag";
+    const r = $("#defRep"); if (r) r.disabled = true;
+    audio.ok();
+    NB.add("define", "Nuclear DNA replicated. Parent nucleus remains.");
+    toast("Sister chromatid set ready. Seat it in the empty cell.", "");
+  },
+  runMito() {
+    if (this.state !== "copy") return;
+    this.state = "mito";
+    const m = $("#defMito"); if (m) m.disabled = true;
+    audio.ok();
+    NB.add("define", "Mitosis started. Nuclear DNA is being copied.");
+  },
+  confirmClones() {
+    if (this.state !== "env") return;
+    if (!this.tweaked) return this.fail("Move Clone B’s light or nutrients first — watch phenotype change.");
+    this.state = "who";
+    const s = $("#defStill"); if (s) s.disabled = true;
+    const li = $("#defLight"); if (li) li.disabled = true;
+    const f = $("#defFood"); if (f) f.disabled = true;
+    audio.ok();
+    NB.add("define", "Still clones: nuclear DNA matched after the environment changed.");
+    toast("Correct idea. Now click who matches the parent barcode.", "");
+  },
+  tick() {
+    const L = this.layout();
+    if (!this.nuc) this.reset(false);
+    if (this.state === "idle") {
+      this.nuc.x = lerp(this.nuc.x, L.P.x - 6, 0.12);
+      this.nuc.y = lerp(this.nuc.y, L.P.y - 5, 0.12);
+    }
+    if (this.sis && this.state !== "drag" && this.grab !== "sis") {
+      const tx = this.seated ? L.C.x - 6 : L.P.x + 28;
+      const ty = this.seated ? L.C.y - 5 : L.P.y - 18;
+      this.sis.x = lerp(this.sis.x, tx, 0.16);
+      this.sis.y = lerp(this.sis.y, ty, 0.16);
+    }
+    if (this.grab !== "sperm") { this.gamS.x = lerp(this.gamS.x, L.sperm.x, 0.12); this.gamS.y = lerp(this.gamS.y, L.sperm.y, 0.12); }
+    if (this.grab !== "egg") { this.gamE.x = lerp(this.gamE.x, L.egg.x, 0.12); this.gamE.y = lerp(this.gamE.y, L.egg.y, 0.12); }
+    if (this.state === "mito") {
+      const fast = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      this.mito = Math.min(1, this.mito + (fast ? 1 : 0.011));
+      if (this.mito >= 1) {
+        this.state = "env";
+        this.grow = matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0.16;
+        const li = $("#defLight"); if (li) li.disabled = false;
+        const f = $("#defFood"); if (f) f.disabled = false;
+        const s = $("#defStill"); if (s) s.disabled = false;
+        toast("Two nuclei, one barcode. Change Clone B’s world.", "");
+        NB.add("define", "Mitosis complete. Both cells carry the parent nuclear DNA.");
+      }
+    }
+    if (this.state === "env" || this.state === "who" || this.state === "done") {
+      this.grow = Math.min(1, this.grow + 0.018);
+    }
+    this.draw();
+    if (this._hud !== this.state) {
+      this._hud = this.state;
+      const el = $("#defStep");
+      if (el) el.textContent = this.steps()[this.state];
+    }
+    status(this.steps()[this.state], acc(this.mistakes));
+  },
+  draw() {
+    const L = this.layout(), w = L.w, h = L.h;
     const ctx = fit(sim, w, h);
     ctx.clearRect(0, 0, w, h);
-    const L = { x: w * 0.34, y: h * 0.52, r: 92 };
-    const R = { x: w * 0.66, y: h * 0.52, r: 92 };
-    if (!this.nuc.x) { this.nuc.x = L.x - 8; this.nuc.y = L.y - 6; }
-    drawDust(ctx, w, h, t, 36);
-    const near = dist(this.nuc, R) < 96;
-    drawCell(ctx, { x: L.x, y: L.y, r: L.r, t, kind: "soma", showNuc: false, hot: this.nuc.grab });
-    drawCell(ctx, { x: R.x, y: R.y, r: R.r, t, kind: "soma", showNuc: this.nuc.done, hot: near && !this.nuc.done, pulse: this.nuc.done ? 0.4 + Math.sin(t * 2) * 0.2 : 0 });
-    ctx.beginPath(); ctx.arc(this.nuc.x, this.nuc.y, 18 + Math.sin(t * 4) * 1.2, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(70,190,140,0.92)"; ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.fillStyle = "rgba(232,239,230,0.78)";
-    ctx.font = "15px IBM Plex Sans";
-    ctx.fillText("Parent · diploid nucleus", L.x - 70, L.y + 124);
-    ctx.fillText(this.nuc.done ? "Clone — same nuclear DNA · mitosis" : "Empty cell · waiting for a nucleus", R.x - 92, R.y + 124);
-    status(this.nuc.done ? "Genomes match. Phenotype can still differ with environment." : "Drag the nucleus into the empty cell.", 100);
+    drawDust(ctx, w, h, t, 40);
+    ctx.fillStyle = "rgba(16,22,20,0.45)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(w * 0.12, h * 0.16, w * 0.72, h * 0.70, 18);
+    else ctx.rect(w * 0.12, h * 0.16, w * 0.72, h * 0.70);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(212,180,138,0.22)"; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.fillStyle = "rgba(212,180,138,0.62)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.textAlign = "center";
+    ctx.fillText("GENOME COMPARISON  ·  4BI1  ·  NUCLEAR DNA", w * 0.48, h * 0.20);
+    ctx.textAlign = "start";
+
+    this.drawBarcode(ctx, w * 0.48, h * 0.235, PARENT_SEQ, "parent nuclear barcode");
+
+    if (this.state === "env") this.drawGrown(ctx, L);
+    else if (this.state === "who" || this.state === "done") this.drawWho(ctx, L);
+    else this.drawCells(ctx, L);
+
+    if (this.state === "idle" || this.state === "drag" || this.state === "copy") this.drawGametes(ctx, L);
   },
-  down(p) { if (inspect) return this.inspectAt(p); if (dist(p, this.nuc) < 26) this.nuc.grab = true; },
-  move(p) { if (this.nuc.grab) { this.nuc.x = p.x; this.nuc.y = p.y; } },
+  drawCells(ctx, L) {
+    const seatHot = this.state === "drag" && this.sis && dist(this.sis, L.C) < L.C.r;
+    drawCell(ctx, { x: L.P.x, y: L.P.y, r: L.P.r, t, kind: "soma", showNuc: false, hot: this.state === "idle" });
+    drawCell(ctx, {
+      x: L.C.x, y: L.C.y, r: L.C.r, t, kind: "soma", showNuc: false,
+      hot: seatHot, pulse: this.seated ? 0.35 + Math.sin(t * 3) * 0.12 : 0
+    });
+    if (this.state === "mito") this.drawMito(ctx, L.P.x, L.P.y, L.P.r);
+    if (this.state === "mito" && this.seated) this.drawMito(ctx, L.C.x, L.C.y, L.C.r);
+    this.drawNuc(ctx, this.nuc.x, this.nuc.y, 17, this.grab === "nuc");
+    if (this.sis && this.state !== "mito") {
+      this.drawNuc(ctx, this.sis.x, this.sis.y, 17, this.grab === "sis" || this.state === "drag");
+      ctx.fillStyle = "rgba(142,224,184,0.95)";
+      ctx.font = "12px IBM Plex Sans";
+      ctx.textAlign = "center";
+      ctx.fillText(this.seated ? "mitotic copy seated" : "sister nucleus  ·  drag into empty cell", this.sis.x, this.sis.y - 28);
+      ctx.textAlign = "start";
+    }
+    ctx.fillStyle = "rgba(232,239,230,0.78)";
+    ctx.font = "14px IBM Plex Sans";
+    ctx.textAlign = "center";
+    ctx.fillText("Parent  ·  diploid nucleus stays", L.P.x, L.P.y + L.P.r + 28);
+    ctx.fillText(this.seated ? "Copy  ·  same nuclear DNA" : "Empty cell  ·  waiting for a mitotic copy", L.C.x, L.C.y + L.C.r + 28);
+    ctx.textAlign = "start";
+    if (this.replicated && this.state === "drag") {
+      ctx.strokeStyle = "rgba(142,224,184,0.35)";
+      ctx.setLineDash([5, 6]);
+      ctx.beginPath(); ctx.moveTo(this.sis.x, this.sis.y); ctx.lineTo(L.C.x, L.C.y); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  },
+  drawMito(ctx, x, y, r) {
+    const u = this.mito;
+    ctx.save();
+    ctx.translate(x, y);
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const spread = u < 0.45 ? 22 : 22 + (u - 0.45) * 70;
+      const side = i % 2 === 0 ? 1 : -1;
+      const cx = Math.cos(ang) * (u < 0.45 ? 18 : spread * 0.35);
+      const cy = Math.sin(ang) * (u < 0.45 ? 14 : spread * 0.28) + (u > 0.45 ? side * (u - 0.45) * 40 : 0);
+      ctx.strokeStyle = "rgba(120,220,180,0.85)";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 7, cy - 3);
+      ctx.quadraticCurveTo(cx, cy + (u < 0.35 ? 8 : 2), cx + 7, cy - 3);
+      ctx.stroke();
+      if (u > 0.22) {
+        ctx.beginPath();
+        ctx.moveTo(cx - 7, cy + 3);
+        ctx.quadraticCurveTo(cx, cy - (u < 0.35 ? 8 : 2), cx + 7, cy + 3);
+        ctx.stroke();
+      }
+    }
+    if (u > 0.72) {
+      ctx.strokeStyle = `rgba(200,230,210,${(u - 0.72) * 3})`;
+      ctx.beginPath(); ctx.moveTo(-r * 0.9, 0); ctx.lineTo(r * 0.9, 0); ctx.stroke();
+    }
+    ctx.restore();
+    drawHelix(ctx, x - 70, y + r + 46, 140, t + u * 4, true);
+  },
+  drawGrown(ctx, L) {
+    const aScale = 1.08 * this.grow;
+    const bScale = (0.62 + this.food / 180) * this.grow;
+    const aHue = 0.55;
+    const bHue = 0.18 + this.light / 180;
+    this.drawCritter(ctx, L.P.x, L.P.y + 10, aScale, aHue, "Clone A  ·  matched conditions", PARENT_SEQ, true);
+    this.drawCritter(ctx, L.C.x, L.C.y + 10, bScale, bHue, "Clone B  ·  your environment", PARENT_SEQ, true);
+    ctx.fillStyle = "rgba(224,180,120,0.85)";
+    ctx.font = "13px IBM Plex Sans";
+    ctx.textAlign = "center";
+    ctx.fillText(this.tweaked ? "Phenotypes differ. Barcodes still match." : "Pull Clone B’s sliders — watch size and pigment, not the barcode.", L.w * 0.48, L.h * 0.78);
+    ctx.textAlign = "start";
+  },
+  drawWho(ctx, L) {
+    const items = [
+      { seq: PARENT_SEQ, label: "same nuclear DNA", clone: true },
+      { seq: SEX_SEQ, label: "two gametes mixed", clone: false },
+      { seq: UNREL_SEQ, label: "unrelated genome", clone: false }
+    ];
+    const xs = [L.w * 0.22, L.w * 0.42, L.w * 0.62];
+    const y = L.h * 0.50;
+    this.whoHits = [];
+    this.order.forEach((idx, i) => {
+      const it = items[idx];
+      const x = xs[i];
+      this.whoHits.push({ x, y, r: 88, clone: it.clone, i });
+      ctx.fillStyle = this.state === "done" && it.clone ? "rgba(110,196,160,0.16)" : "rgba(8,12,10,0.55)";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - 86, y - 118, 172, 230, 14); else ctx.rect(x - 86, y - 118, 172, 230);
+      ctx.fill();
+      ctx.strokeStyle = it.clone && this.state === "done" ? "rgba(142,224,184,0.85)" : "rgba(212,180,138,0.28)";
+      ctx.stroke();
+      this.drawCritter(ctx, x, y - 24, 0.7, it.clone ? 0.55 : (idx === 1 ? 0.52 : 0.12), "", it.seq, true);
+      ctx.fillStyle = "rgba(232,239,230,0.8)";
+      ctx.font = "12px IBM Plex Sans";
+      ctx.textAlign = "center";
+      ctx.fillText(this.state === "done" ? it.label : "Organism " + String.fromCharCode(80 + i), x, y + 96);
+    });
+    ctx.fillStyle = "rgba(224,180,120,0.85)";
+    ctx.font = "13px IBM Plex Sans";
+    ctx.textAlign = "center";
+    ctx.fillText(this.state === "done" ? "The clone is the match — appearance was a decoy." : "Click whose nuclear barcode matches the parent.", L.w * 0.42, L.h * 0.78);
+    ctx.textAlign = "start";
+  },
+  drawCritter(ctx, x, y, s, hue, label, seq, showBar) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    const g = ctx.createRadialGradient(-20, -30, 8, 0, 10, 70);
+    g.addColorStop(0, `rgba(${140 + hue * 110},${190 + hue * 30},${110},0.95)`);
+    g.addColorStop(0.55, `rgba(${70 + hue * 90},${130 + hue * 20},${70},0.92)`);
+    g.addColorStop(1, `rgba(18,40,22,0.96)`);
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 48, 38, 0, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(230,250,220,0.7)";
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-18, -28, 10, 16, -0.3, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.ellipse(18, -28, 10, 16, 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${70 + hue * 100},${130},${80},0.9)`;
+    ctx.beginPath(); ctx.ellipse(-18, -28, 10, 16, -0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(18, -28, 10, 16, 0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(20,28,22,0.9)";
+    ctx.beginPath(); ctx.arc(-12, 0, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(12, 0, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (showBar) this.drawBarcode(ctx, x, y + 58 * s, seq, label);
+  },
+  drawGametes(ctx, L) {
+    ctx.fillStyle = "rgba(180,160,230,0.55)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.textAlign = "center";
+    ctx.fillText("DECOYS  ·  SEXUAL REPRODUCTION", (L.sperm.x + L.egg.x) / 2, L.sperm.y - 36);
+    ctx.beginPath(); ctx.ellipse(this.gamS.x, this.gamS.y, 10, 7, t, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(160,140,230,0.9)"; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(this.gamS.x + 10, this.gamS.y);
+    ctx.quadraticCurveTo(this.gamS.x + 28, this.gamS.y + Math.sin(t * 8) * 6, this.gamS.x + 40, this.gamS.y);
+    ctx.strokeStyle = "rgba(180,170,230,0.8)"; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.fillText("sperm  ·  haploid", this.gamS.x, this.gamS.y + 28);
+    drawCell(ctx, { x: this.gamE.x, y: this.gamE.y, r: 20, t, kind: "egg", showNuc: true, hot: this.grab === "egg" });
+    ctx.fillStyle = "rgba(224,180,140,0.8)";
+    ctx.fillText("egg  ·  haploid nucleus", this.gamE.x, this.gamE.y + 36);
+    ctx.textAlign = "start";
+  },
+  drawNuc(ctx, x, y, r, hot) {
+    const g = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, r);
+    g.addColorStop(0, "rgba(120,220,180,0.95)");
+    g.addColorStop(1, "rgba(20,80,60,0.92)");
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.86, 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = hot ? "rgba(142,224,184,0.95)" : "rgba(255,255,255,0.32)";
+    ctx.lineWidth = hot ? 2.4 : 1.1; ctx.stroke();
+    if (hot) {
+      ctx.beginPath(); ctx.arc(x, y, r + 8 + Math.sin(t * 6) * 2, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(142,224,184,0.7)"; ctx.lineWidth = 2; ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x - 8 + i * 4, y - 7);
+      ctx.quadraticCurveTo(x - 2 + i * 2, y + Math.sin(t + i) * 3, x - 6 + i * 4, y + 7);
+      ctx.stroke();
+    }
+  },
+  drawBarcode(ctx, x, y, seq, label) {
+    const w = seq.length * 11;
+    let px = x - w / 2;
+    for (let i = 0; i < seq.length; i++) {
+      ctx.fillStyle = BASES[seq[i]];
+      ctx.fillRect(px, y, 9, 14);
+      px += 11;
+    }
+    if (label) {
+      ctx.fillStyle = "rgba(200,210,200,0.7)";
+      ctx.font = "11px IBM Plex Mono";
+      ctx.textAlign = "center";
+      ctx.fillText(label, x, y + 28);
+      ctx.textAlign = "start";
+    }
+  },
+  down(p) {
+    if (inspect) return this.inspectAt(p);
+    if (this.state === "who") {
+      const hit = (this.whoHits || []).find((h) => dist(p, h) < h.r);
+      if (!hit) return;
+      if (hit.clone) {
+        this.state = "done";
+        audio.ok();
+        markSim("define");
+        NB.add("define", "Identified the clone by matching nuclear DNA, not appearance.");
+        toast("Clone = same nuclear DNA, copied by mitosis.", "");
+      } else this.fail("Look at the barcode. The clone matches the parent nuclear DNA — not a sexual mix.");
+      return;
+    }
+    if (this.state === "idle" && dist(p, this.nuc) < 22) { this.replicate(); return; }
+    if (this.state === "drag" && this.sis && dist(p, this.sis) < 24) { this.grab = "sis"; return; }
+    if (this.state === "idle" || this.state === "drag") {
+      if (dist(p, this.gamS) < 24) { this.grab = "sperm"; return; }
+      if (dist(p, this.gamE) < 30) { this.grab = "egg"; return; }
+    }
+    if (this.state === "idle" && dist(p, this.layout().P) < 90) this.replicate();
+  },
+  move(p) {
+    if (this.grab === "sis" && this.sis) { this.sis.x = p.x; this.sis.y = p.y; }
+    if (this.grab === "sperm") { this.gamS.x = p.x; this.gamS.y = p.y; }
+    if (this.grab === "egg") { this.gamE.x = p.x; this.gamE.y = p.y; }
+    if (this.state === "idle" && this.grab === "nuc") { this.nuc.x = p.x; this.nuc.y = p.y; }
+  },
   up(p) {
-    if (!this.nuc.grab) return;
-    this.nuc.grab = false;
-    const R = { x: innerWidth * 0.66, y: innerHeight * 0.52 };
-    if (dist(p, R) < 80) {
-      this.nuc.done = true;
-      this.nuc.x = R.x - 6; this.nuc.y = R.y - 6;
-      audio.ok();
-      NB.add("scnt", "Definition: clone = same nuclear DNA, copied by mitosis.");
+    const L = this.layout();
+    const g = this.grab;
+    this.grab = null;
+    if (!g) return;
+    if (g === "sis") {
+      if (dist(this.sis, L.C) < L.C.r - 8) {
+        this.seated = true;
+        this.sis.x = L.C.x - 6; this.sis.y = L.C.y - 5;
+        this.state = "copy";
+        const m = $("#defMito"); if (m) m.disabled = false;
+        audio.ok();
+        NB.add("define", "Sister nucleus seated. Parent still has its own genome.");
+        toast("Ready for mitosis. The parent was not emptied.", "");
+      } else if (dist(this.sis, L.P) < L.P.r) {
+        this.fail("The parent already has its nucleus. Seat the copy in the empty cell.");
+      }
+      return;
+    }
+    if (g === "sperm" || g === "egg") {
+      if (dist(p, L.C) < L.C.r || dist(p, L.P) < L.P.r) {
+        this.fail("Gametes mix two genomes. That is sexual reproduction — the offspring is not a clone.");
+      }
+    }
+    if (g === "nuc") {
+      this.fail("Cloning copies nuclear DNA by mitosis. It does not steal the parent’s only nucleus.");
     }
   },
   inspectAt(p) {
-    if (dist(p, { x: innerWidth * 0.34, y: innerHeight * 0.52 }) < 90)
-      callout("Nucleus", "Holds the diploid nuclear genome. This is what a clone copies.", p.x, p.y);
+    const L = this.layout();
+    if (dist(p, L.P) < L.P.r) callout("Parent cell", "Diploid nucleus stays here. Cloning copies it by mitosis; the parent is not emptied.", p.x, p.y);
+    else if (dist(p, L.C) < L.C.r) callout("Recipient cell", "Receives a mitotic copy of nuclear DNA. Same genes as the parent.", p.x, p.y);
+    else if (dist(p, this.gamS) < 28) callout("Sperm", "Haploid gamete. Fusion with an egg shuffles alleles — not a clone.", p.x, p.y);
+    else if (dist(p, this.gamE) < 32) callout("Egg", "Haploid nucleus. Needed for fertilisation, not for making a clone of this parent.", p.x, p.y);
+    else if ((this.whoHits || []).some((h) => dist(p, h) < h.r)) callout("Nuclear barcode", "Read the sequence. The clone matches the parent. Appearance can lie.", p.x, p.y);
     else hideCallout();
   }
 };
+function bindDefDock() {
+  $("#defRep").onclick = (e) => { e.stopPropagation(); Define.replicate(); };
+  $("#defMito").onclick = (e) => { e.stopPropagation(); Define.runMito(); };
+  $("#defStill").onclick = (e) => { e.stopPropagation(); Define.confirmClones(); };
+  const sync = () => {
+    Define.light = Number($("#defLight").value);
+    Define.food = Number($("#defFood").value);
+    if (Define.state === "env") Define.tweaked = true;
+  };
+  $("#defLight").oninput = sync;
+  $("#defFood").oninput = sync;
+}
 
 /* ---------- SCNT ---------- */
 const SCNT = {
@@ -582,85 +983,415 @@ function bindScntDock() {
 }
 
 /* ---------- DOLLY ---------- */
+const FINN_DNA = [0, 1, 2, 0, 1, 2, 3, 1];
+const BF_DNA = [3, 2, 3, 0, 2, 3, 1, 0];
+
 const Dolly = {
   state: "soma", soma: null, egg: null, nucE: null, recon: null, embryo: null,
-  born: false, mistakes: 0, pulse: 0, spark: 0, _hud: "",
+  born: false, mistakes: 0, spark: 0, cleave: 0, starved: false, starveT: 0, _hud: "",
+  mito: [], holdingStarve: false,
   layout() {
-    const w = innerWidth, h = innerHeight;
+    const w = innerWidth, h = innerHeight, ph = this.phase();
+    const cy = h * 0.46;
+    if (ph === "donor") return {
+      w, h,
+      finn: { x: w * 0.34, y: cy },
+      eggE: { x: w * 0.78, y: h * 0.28 },
+      surr: { x: w * 0.78, y: h * 0.72 },
+      x: { x: w * 0.58, y: h * 0.60 },
+      tube: { x: w * 0.72, y: h * 0.60 },
+      dolly: { x: w * 0.34, y: h * 0.78 }
+    };
+    if (ph === "pair") return {
+      w, h,
+      finn: { x: w * 0.26, y: cy },
+      eggE: { x: w * 0.58, y: cy },
+      surr: { x: w * 0.82, y: h * 0.72 },
+      x: { x: w * 0.42, y: h * 0.68 },
+      tube: { x: w * 0.62, y: h * 0.68 },
+      dolly: { x: w * 0.26, y: h * 0.78 }
+    };
+    if (ph === "womb") return {
+      w, h,
+      finn: { x: w * 0.18, y: h * 0.22 },
+      eggE: { x: w * 0.36, y: h * 0.22 },
+      surr: { x: w * 0.64, y: cy },
+      x: { x: w * 0.30, y: h * 0.58 },
+      tube: { x: w * 0.30, y: h * 0.58 },
+      dolly: { x: w * 0.40, y: cy }
+    };
+    if (ph === "compare") return {
+      w, h,
+      finn: { x: w * 0.22, y: h * 0.36 },
+      eggE: { x: w * 0.50, y: h * 0.36 },
+      surr: { x: w * 0.78, y: h * 0.36 },
+      x: { x: w * 0.40, y: h * 0.72 },
+      tube: { x: w * 0.62, y: h * 0.72 },
+      dolly: { x: w * 0.22, y: h * 0.78 }
+    };
     return {
-      finn: { x: w * 0.2, y: h * 0.3 },
-      eggE: { x: w * 0.8, y: h * 0.3 },
-      surr: { x: w * 0.78, y: h * 0.76 },
-      x: { x: w * 0.5, y: h * 0.38 },
-      tube: { x: w * 0.5, y: h * 0.58 },
-      dolly: { x: w * 0.22, y: h * 0.76 }
+      w, h,
+      finn: { x: w * 0.18, y: h * 0.22 },
+      eggE: { x: w * 0.36, y: h * 0.22 },
+      surr: { x: w * 0.82, y: h * 0.22 },
+      x: { x: w * 0.38, y: h * 0.56 },
+      tube: { x: w * 0.62, y: h * 0.56 },
+      dolly: { x: w * 0.18, y: h * 0.78 }
     };
   },
-  reset() {
-    Object.assign(this, { state: "soma", soma: null, egg: null, nucE: null, recon: null, embryo: null, born: false, mistakes: 0, pulse: 0, spark: 0, drag: null, _hud: "" });
-    const b = $("#dPulse"); if (b) { b.disabled = true; const i = b.querySelector("i"); if (i) i.style.width = "0"; }
+  phase() {
+    const s = this.state;
+    if (s === "soma" || s === "starve") return "donor";
+    if (s === "egg") return "pair";
+    if (s === "implant" || s === "birth") return "womb";
+    if (s === "who" || s === "done") return "compare";
+    return "bench";
   },
-  sheep(ctx, x, y, kind, label, glow) {
+  reset(log) {
+    Object.assign(this, { state: "soma", soma: null, egg: null, nucE: null, recon: null, embryo: null, born: false, mistakes: 0, spark: 0, cleave: 0, starved: false, starveT: 0, drag: null, _hud: "", mito: [], holdingStarve: false });
+    const b = $("#dPulse"); if (b) { b.disabled = true; const i = b.querySelector("i"); if (i) i.style.width = "0"; }
+    const s = $("#dStarve"); if (s) { s.disabled = true; const i = s.querySelector("i"); if (i) i.style.width = "0"; }
+    if (log) NB.add("dolly", "Roslin bench reset.");
+  },
+  barcode(ctx, x, y, seq) {
+    let px = x - seq.length * 5.5;
+    for (let i = 0; i < seq.length; i++) {
+      ctx.fillStyle = BASES[seq[i]];
+      ctx.fillRect(px, y, 9, 11);
+      px += 11;
+    }
+  },
+  pen(ctx, x, y, hot) {
+    ctx.save();
+    ctx.translate(x, y + 50);
+    ctx.fillStyle = hot ? "rgba(212,180,138,0.10)" : "rgba(0,0,0,0.22)";
+    ctx.beginPath(); ctx.ellipse(0, 8, 62, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+  plate(ctx, x, y, title, sub, on) {
+    ctx.fillStyle = on ? "rgba(142,224,184,0.14)" : "rgba(8,12,14,0.5)";
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x - 70, y, 140, 36, 8); ctx.fill(); }
+    else ctx.fillRect(x - 70, y, 140, 36);
+    ctx.strokeStyle = on ? "rgba(142,224,184,0.55)" : "rgba(180,200,210,0.18)";
+    ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.fillStyle = on ? "#d6f3e4" : "#c5d0c8";
+    ctx.font = "600 11px IBM Plex Sans";
+    ctx.fillText(title, x, y + 15);
+    ctx.fillStyle = "rgba(180,200,210,0.7)";
+    ctx.font = "10px IBM Plex Mono";
+    ctx.fillText(sub, x, y + 28);
+    ctx.textAlign = "start";
+  },
+  drawPips(ctx, w) {
+    const keys = ["soma", "starve", "egg", "enuc", "transfer", "tube", "pulse", "implant", "who"];
+    const i = Math.max(0, keys.indexOf(this.state === "birth" ? "who" : this.state === "done" ? "who" : this.state));
+    const x0 = w * 0.5 - 72;
+    for (let n = 0; n < 9; n++) {
+      ctx.beginPath(); ctx.arc(x0 + n * 18, 92, n === i ? 4.2 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = n < i ? "rgba(142,224,184,0.85)" : n === i ? "rgba(232,210,160,0.95)" : "rgba(180,200,210,0.22)";
+      ctx.fill();
+    }
+  },
+  drawCycle(ctx, x, y) {
+    const R = 54;
+    ctx.save();
+    ctx.strokeStyle = "rgba(180,210,200,0.22)"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(x, y, R, 0.15, Math.PI * 1.72); ctx.stroke();
+    const g0 = this.starveT;
+    ctx.strokeStyle = `rgba(232,196,120,${0.35 + g0 * 0.6})`;
+    ctx.beginPath(); ctx.arc(x, y, R, Math.PI * 1.72, Math.PI * 2.12); ctx.stroke();
+    ctx.fillStyle = "rgba(200,214,208,0.55)"; ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("G1", x, y - R - 8);
+    ctx.fillText("S", x + R + 14, y + 4);
+    ctx.fillText("G2", x, y + R + 16);
+    ctx.fillText("M", x - R - 14, y + 4);
+    ctx.fillStyle = g0 > 0.55 ? "#e8c878" : "rgba(232,200,120,0.7)";
+    ctx.fillText("G0", x - R - 4, y + R + 4);
+    ctx.beginPath(); ctx.arc(x + Math.cos(Math.PI * 1.92) * R, y + Math.sin(Math.PI * 1.92) * R, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.textAlign = "start";
+  },
+  drawMito(ctx, x, y, r) {
+    for (let i = 0; i < this.mito.length; i++) {
+      const m = this.mito[i];
+      const a = m.a + t * 0.35;
+      const mx = x + Math.cos(a) * (r * 0.55 + m.d);
+      const my = y + Math.sin(a * 1.1) * (r * 0.42 + m.d * 0.6);
+      ctx.save();
+      ctx.translate(mx, my); ctx.rotate(a);
+      ctx.fillStyle = "rgba(210,120,70,0.8)";
+      ctx.beginPath(); ctx.ellipse(0, 0, 7, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(255,200,140,0.45)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-4, 0); ctx.quadraticCurveTo(0, 2.2, 4, 0); ctx.stroke();
+      ctx.restore();
+    }
+  },
+  drawPipette(ctx, tipx, tipy) {
+    const bx = tipx + 86, by = tipy - 110;
+    ctx.strokeStyle = "rgba(210,230,240,0.7)"; ctx.lineWidth = 7; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tipx + 8, tipy - 4); ctx.stroke();
+    ctx.strokeStyle = "rgba(160,200,220,0.95)"; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tipx + 8, tipy - 4); ctx.stroke();
+    ctx.fillStyle = "rgba(200,220,230,0.85)";
+    ctx.beginPath(); ctx.moveTo(tipx + 14, tipy - 10); ctx.lineTo(tipx - 2, tipy); ctx.lineTo(tipx + 12, tipy + 8); ctx.fill();
+  },
+  drawScope(ctx, L, w, h) {
+    const cx = (L.x.x + L.tube.x) / 2, cy = L.x.y;
+    const R = Math.min(228, Math.min(w, h) * 0.28);
+    ctx.fillStyle = "rgba(2,6,10,0.52)";
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.arc(cx, cy, R, 0, Math.PI * 2, true);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(160,210,230,0.35)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "rgba(160,210,230,0.18)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx - 18, cy); ctx.lineTo(cx + 18, cy);
+    ctx.moveTo(cx, cy - 18); ctx.lineTo(cx, cy + 18); ctx.stroke();
+    ctx.fillStyle = "rgba(180,210,230,0.55)"; ctx.font = "11px IBM Plex Mono";
+    ctx.fillText("micromanipulation  ·  ×40", cx - 78, cy - R - 12);
+  },
+  sheep(ctx, x, y, kind, label, glow, seq, young) {
     ctx.save();
     ctx.translate(x, y);
-    if (glow) { ctx.shadowColor = "rgba(232,210,160,0.7)"; ctx.shadowBlur = 22; }
-    const wool = kind === "black" ? "#e8e0d4" : "#f0e2c8";
-    const face = kind === "black" ? "#2a1810" : "#f6e8d4";
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
-    ctx.beginPath(); ctx.ellipse(4, 36, 46, 8, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = wool;
-    ctx.beginPath(); ctx.ellipse(0, 8, 52, 32, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(-16, 0, 18, 16, -0.25, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(10, -8, 20, 18, 0.2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(22, 6, 16, 14, 0.1, 0, Math.PI * 2); ctx.fill();
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const breath = reduce ? 0 : Math.sin(t * 1.55 + x * 0.01) * 0.016;
+    const nod = reduce ? 0 : Math.sin(t * 0.8 + y * 0.01) * 0.035;
+    const s = young ? 0.72 : (this.phase() === "compare" ? 0.84 : this.phase() === "donor" || this.phase() === "pair" ? 1.12 : 0.95);
+    ctx.scale(s, s);
+    if (glow) { ctx.shadowColor = "rgba(232,210,160,0.35)"; ctx.shadowBlur = 16; }
+
+    const dark = kind === "black";
+    const fleeceHi = dark ? "#f4ece0" : "#fff8ee";
+    const fleece = dark ? "#e6d8c2" : "#f3e4cc";
+    const fleeceLo = dark ? "#c4b08e" : "#d2bc96";
+    const skin = dark ? "#1a100c" : "#f0d2b4";
+    const skinMid = dark ? "#2a1812" : "#e8c4a0";
+    const muzzle = dark ? "#120c0a" : "#f3c8b0";
+    const leg = dark ? "#1c120e" : "#eed6b8";
+    const legLo = dark ? "#100a08" : "#c8a888";
+    const hoof = dark ? "#090604" : "#4a3220";
+    const iris = dark ? "#3d2814" : "#5a3a1c";
+
+    ctx.fillStyle = "rgba(0,0,0,0.26)";
+    ctx.beginPath(); ctx.ellipse(6, 60, 62, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    const wool = (px, py, rx, ry, rot) => {
+      const g = ctx.createRadialGradient(px - rx * 0.28, py - ry * 0.4, 1.5, px, py, Math.max(rx, ry));
+      g.addColorStop(0, fleeceHi);
+      g.addColorStop(0.5, fleece);
+      g.addColorStop(1, fleeceLo);
+      ctx.beginPath();
+      ctx.ellipse(px, py, rx, ry, rot || 0, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+    };
+    const cloven = (hx, hy) => {
+      ctx.fillStyle = hoof;
+      ctx.beginPath(); ctx.ellipse(hx - 2.6, hy, 3.0, 2.4, -0.18, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(hx + 2.6, hy, 3.0, 2.4, 0.18, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(hx - 0.6, hy - 1.2, 1.2, 2.6);
+    };
+    const limb = (hx, hy, fx, far) => {
+      ctx.fillStyle = far ? legLo : leg;
+      ctx.beginPath();
+      ctx.moveTo(hx - 6.5, hy);
+      ctx.quadraticCurveTo(hx + (far ? -4 : 2), hy + 16, fx - 4.2, 48);
+      ctx.lineTo(fx + 4.2, 48);
+      ctx.quadraticCurveTo(hx + 7, hy + 14, hx + 6.5, hy);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = dark ? (far ? "#0c0806" : "#16100c") : (far ? "#b08a6a" : "#e2c4a4");
+      ctx.beginPath();
+      ctx.moveTo(fx - 4.4, 40);
+      ctx.lineTo(fx + 4.4, 40);
+      ctx.lineTo(fx + 3.6, 50);
+      ctx.lineTo(fx - 3.6, 50);
+      ctx.closePath(); ctx.fill();
+      cloven(fx, 53);
+    };
+
+    limb(-22, 16, -24, true);
+    limb(20, 14, 18, true);
+    limb(-8, 20, -6, false);
+    limb(34, 18, 36, false);
+
+    ctx.save();
+    ctx.translate(0, 6 + breath * 9);
+    ctx.scale(1 + breath, 1 - breath * 0.32);
+    wool(-8, 6, 40, 24, -0.12);
+    wool(16, 8, 32, 22, 0.16);
+    wool(-26, 10, 22, 16, -0.28);
+    wool(4, -10, 28, 16, -0.04);
+    [
+      [-34, 4, 14, 11, 0.45], [-26, -10, 15, 12, 0.2], [-10, -18, 16, 13, 0.02],
+      [8, -20, 17, 13, -0.08], [24, -14, 14, 12, -0.22], [36, -2, 13, 11, -0.4],
+      [34, 16, 14, 11, -0.15], [18, 24, 16, 11, 0.08], [0, 26, 17, 11, 0],
+      [-18, 22, 15, 10, 0.2], [-30, 14, 13, 10, 0.32], [-6, 2, 18, 14, 0.04],
+      [12, 2, 17, 13, -0.1], [22, 10, 14, 11, -0.18], [-14, -4, 14, 12, 0.12]
+    ].forEach(p => wool(...p));
+    wool(-42, 12, 9, 7, 0.55);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(30, -6);
+    ctx.rotate(nod);
+
+    wool(-16, 8, 16, 12, 0.4);
+    wool(-6, 2, 14, 11, 0.15);
+
+    if (dark && !young) {
+      ctx.strokeStyle = "#6a4e32"; ctx.lineWidth = 5.5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-10, -16); ctx.quadraticCurveTo(-28, -30, -26, -6); ctx.stroke();
+      ctx.strokeStyle = "#c4a070"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-10, -16); ctx.quadraticCurveTo(-26, -28, -24, -8); ctx.stroke();
+    }
+
+    ctx.fillStyle = dark ? "#241610" : fleeceHi;
+    ctx.beginPath(); ctx.ellipse(-18, -8, 6.5, 13, 0.85, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = dark ? "#c48870" : "#e8b49a";
+    ctx.beginPath(); ctx.ellipse(-18, -7, 3.2, 8, 0.85, 0, Math.PI * 2); ctx.fill();
+
+    const face = ctx.createLinearGradient(-12, -18, 16, 22);
+    face.addColorStop(0, dark ? "#2c1a14" : "#f7e4cc");
+    face.addColorStop(0.45, skin);
+    face.addColorStop(1, skinMid);
     ctx.fillStyle = face;
-    ctx.beginPath(); ctx.ellipse(44, 2, 18, 15, 0.2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = wool;
-    ctx.beginPath(); ctx.ellipse(34, -14, 8, 12, 0.45, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(50, -10, 6, 10, -0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = kind === "black" ? "rgba(0,0,0,0.55)" : "rgba(80,40,30,0.55)";
-    ctx.beginPath(); ctx.arc(52, 0, 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = kind === "black" ? "#3a2018" : "#e8b4a8";
-    ctx.beginPath(); ctx.ellipse(58, 6, 5, 3, 0.2, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = kind === "black" ? "#3a2418" : "#c4a078";
-    ctx.lineWidth = 4; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(-18, 28); ctx.lineTo(-18, 44);
-    ctx.moveTo(8, 30); ctx.lineTo(10, 46);
-    ctx.moveTo(22, 28); ctx.lineTo(24, 44); ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(2, 2, young ? 20 : 19, young ? 17 : 16, 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = muzzle;
+    ctx.beginPath();
+    ctx.moveTo(-6, 8);
+    ctx.quadraticCurveTo(6, 6, 16, 12);
+    ctx.quadraticCurveTo(18, 22, 6, 24);
+    ctx.quadraticCurveTo(-8, 22, -10, 14);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = dark ? "#241610" : fleeceHi;
+    ctx.beginPath(); ctx.ellipse(12, -12, 7, 13, -0.45, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = dark ? "#c48870" : "#e8b49a";
+    ctx.beginPath(); ctx.ellipse(12, -11, 3.4, 8, -0.45, 0, Math.PI * 2); ctx.fill();
+
+    if (dark && !young) {
+      ctx.strokeStyle = "#8a6844"; ctx.lineWidth = 6; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(8, -16); ctx.quadraticCurveTo(26, -32, 30, -8); ctx.stroke();
+      ctx.strokeStyle = "#d4b078"; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(8, -16); ctx.quadraticCurveTo(24, -30, 28, -10); ctx.stroke();
+    }
+
+    const eye = (ex, ey, rx, ry) => {
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.beginPath(); ctx.ellipse(ex + 0.6, ey + 1.2, rx, ry * 0.7, 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#f4efe6";
+      ctx.beginPath(); ctx.ellipse(ex, ey, rx, ry, 0.12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = iris;
+      ctx.beginPath(); ctx.ellipse(ex + 0.35, ey + 0.2, rx * 0.62, ry * 0.7, 0.12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#0b0705";
+      ctx.beginPath(); ctx.ellipse(ex + 0.45, ey + 0.25, rx * 0.28, ry * 0.55, 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(ex + rx * 0.28, ey - ry * 0.28, Math.max(0.7, rx * 0.18), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = dark ? "rgba(10,6,4,0.55)" : "rgba(70,40,28,0.4)";
+      ctx.lineWidth = 1.15;
+      ctx.beginPath(); ctx.ellipse(ex, ey - ry * 0.15, rx * 1.05, ry * 0.55, 0.1, Math.PI, Math.PI * 2); ctx.stroke();
+    };
+    eye(-7, -1, young ? 4.1 : 3.6, young ? 4.4 : 3.9);
+    eye(9, 0.5, young ? 4.8 : 4.4, young ? 5.1 : 4.8);
+
+    ctx.fillStyle = dark ? "#080504" : "#c47868";
+    ctx.beginPath(); ctx.ellipse(8, 18, 2.6, 1.8, 0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(3.2, 19, 2.4, 1.7, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = dark ? "rgba(80,40,30,0.75)" : "rgba(160,90,80,0.6)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(5, 20.5, 5, 0.15, Math.PI - 0.2); ctx.stroke();
+    if (!dark) {
+      ctx.fillStyle = "rgba(232,140,150,0.32)";
+      ctx.beginPath(); ctx.ellipse(-2, 10, 6, 4, 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(10, 11, 5, 3.4, -0.15, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.restore();
     ctx.restore();
     ctx.fillStyle = glow ? "#f0e0b8" : "#c5d0c8";
-    ctx.font = "13px IBM Plex Sans"; ctx.textAlign = "center";
-    ctx.fillText(label, x, y + 62); ctx.textAlign = "start";
+    ctx.font = "12px IBM Plex Sans"; ctx.textAlign = "center";
+    ctx.fillText(label, x, y + 74);
+    if (seq && this.phase() === "compare") this.barcode(ctx, x, y + 84, seq);
+    ctx.textAlign = "start";
   },
-  hit(p, s) { return Math.abs(p.x - s.x) < 78 && Math.abs(p.y - s.y) < 56; },
-  fail(m) { this.mistakes++; audio.bad(); toast(m, "warn"); NB.add("dolly", "Error: " + m); },
+  hit(p, s) { return Math.abs(p.x - s.x) < 110 && Math.abs(p.y - s.y) < 78; },
+  fail(m) {
+    this.mistakes++;
+    audio.bad();
+    toast(m, "warn");
+    NB.add("dolly", "Error: " + m);
+    sim.classList.remove("shake");
+    void sim.offsetWidth;
+    sim.classList.add("shake");
+  },
   steps() {
     return {
-      soma: "1 / 8  ·  Click the Finn-Dorset (cream face) for a mammary cell.",
-      egg: "2 / 8  ·  Click the Blackface ewe for an unfertilised egg.",
-      enuc: "3 / 8  ·  Drag the violet egg nucleus onto the red discard X.",
-      transfer: "4 / 8  ·  Drag the pink mammary nucleus into the empty egg.",
-      tube: "5 / 8  ·  Move the reconstructed egg into the fusion chamber.",
-      pulse: "6 / 8  ·  Hold the electric pulse. It starts mitosis — it does not add DNA.",
-      implant: "7 / 8  ·  Drag the embryo onto the Blackface surrogate.",
-      who: "8 / 8  ·  Click the sheep whose nuclear DNA Dolly matches.",
-      done: "Dolly’s nuclear DNA matches the Finn-Dorset mammary donor."
+      soma: "1 / 9  ·  Click the cream-faced Finn-Dorset for a mammary cell.",
+      starve: "2 / 9  ·  Hold serum-starve. Watch the cell leave the cycle and arrest in G0.",
+      egg: "3 / 9  ·  Click the dark-faced Blackface for an unfertilised egg.",
+      enuc: "4 / 9  ·  Pipette the violet egg nucleus onto discard. Mitochondria stay.",
+      transfer: "5 / 9  ·  Seat the G0 mammary nucleus in the empty cytoplasm.",
+      tube: "6 / 9  ·  Move the reconstructed oocyte between the electrodes.",
+      pulse: "7 / 9  ·  Hold the pulse. It starts mitosis — it does not write DNA.",
+      implant: "8 / 9  ·  Wait for 4–8 cells, then drag the embryo onto the surrogate.",
+      birth: "Lamb born. Face like Finn-Dorset. Click her to read nuclear barcodes.",
+      who: "9 / 9  ·  Click the ewe whose nuclear barcode Dolly copied.",
+      done: "Nuclear DNA = Finn-Dorset. Cytoplasm and uterus = Blackface."
     };
   },
   tick() {
-    if (this.spark > 0) this.spark *= 0.92;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (this.spark > 0) this.spark *= reduce ? 0.7 : 0.92;
+    if (this.state === "starve" && (this.holdingStarve || this.starveT > 0) && this.starveT < 1) {
+      this.starveT = Math.min(1, this.starveT + (reduce ? 0.08 : 0.018));
+    }
+    if (this.state === "implant" && this.embryo && !this.embryo.gone) {
+      this.cleave = Math.min(3.2, this.cleave + (reduce ? 0.05 : 0.01));
+    }
     const w = innerWidth, h = innerHeight, ctx = fit(sim, w, h), L = this.layout();
+    const ph = this.phase();
     ctx.clearRect(0, 0, w, h);
-    drawDust(ctx, w, h, t, 22);
-    ctx.fillStyle = "rgba(212,180,138,0.55)"; ctx.font = "12px IBM Plex Mono";
-    ctx.fillText("ROSLIN INSTITUTE  ·  5 JULY 1996", 132, 92);
-    const who = this.state === "who" || this.state === "done";
-    this.sheep(ctx, L.finn.x, L.finn.y, "white", "Finn-Dorset  ·  nuclear donor", this.state === "soma" || who);
-    this.sheep(ctx, L.eggE.x, L.eggE.y, "black", "Blackface  ·  egg donor", this.state === "egg");
-    this.sheep(ctx, L.surr.x, L.surr.y, "black", "Blackface  ·  surrogate", this.state === "implant");
-    if (this.born) this.sheep(ctx, L.dolly.x, L.dolly.y, "white", "Dolly  ·  clone of Finn-Dorset", true);
-    this.drawBench(ctx, L);
-    this.drawBits(ctx);
+    drawDust(ctx, w, h, t, 10);
+    const wash = ctx.createRadialGradient(w * 0.48, h * 0.48, 40, w * 0.48, h * 0.48, h * 0.62);
+    wash.addColorStop(0, "rgba(18,28,32,0.18)");
+    wash.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = wash; ctx.fillRect(0, 0, w, h);
+
+    const who = ph === "compare";
+    if (ph === "donor" || ph === "pair" || ph === "compare") {
+      this.pen(ctx, L.finn.x, L.finn.y, this.state === "soma" || who);
+      this.sheep(ctx, L.finn.x, L.finn.y, "white", "Finn-Dorset", this.state === "soma" || (who && this.state === "done"), FINN_DNA);
+    }
+    if (ph === "pair" || ph === "compare") {
+      this.pen(ctx, L.eggE.x, L.eggE.y, this.state === "egg");
+      this.sheep(ctx, L.eggE.x, L.eggE.y, "black", "Egg donor", this.state === "egg", BF_DNA);
+    }
+    if (ph === "womb" || ph === "compare") {
+      this.pen(ctx, L.surr.x, L.surr.y, this.state === "implant" || this.state === "birth");
+      this.sheep(ctx, L.surr.x, L.surr.y, "black", "Surrogate", this.state === "implant" || this.state === "birth", BF_DNA);
+    }
+    if (this.born && (ph === "compare" || this.state === "birth")) {
+      this.sheep(ctx, L.dolly.x, L.dolly.y, "white", "Dolly", true, FINN_DNA, true);
+    }
+    if (who) this.drawMatch(ctx, L);
+    if (ph === "bench") {
+      this.drawBench(ctx, L, ph);
+      this.drawBits(ctx);
+      this.drawScope(ctx, L, w, h);
+    } else if (ph === "womb") {
+      this.drawBench(ctx, L, ph);
+      this.drawBits(ctx);
+    } else {
+      this.drawBits(ctx);
+    }
+    this.drawPips(ctx, w);
     if (this._hud !== this.state) {
       this._hud = this.state;
       const el = $("#dStep");
@@ -668,93 +1399,166 @@ const Dolly = {
     }
     status(this.steps()[this.state], acc(this.mistakes));
   },
-  drawBench(ctx, L) {
-    ctx.setLineDash([5, 6]);
-    ctx.strokeStyle = "rgba(212,180,138,0.28)"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(L.finn.x + 56, L.finn.y); ctx.lineTo(L.x.x - 28, L.x.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(L.eggE.x - 56, L.eggE.y); ctx.lineTo(L.x.x + 28, L.x.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(L.tube.x, L.tube.y + 50); ctx.lineTo(L.surr.x - 50, L.surr.y - 10); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = "rgba(180,70,60,0.12)";
-    ctx.beginPath(); ctx.arc(L.x.x, L.x.y, 22, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#c45a4a"; ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(L.x.x - 11, L.x.y - 11); ctx.lineTo(L.x.x + 11, L.x.y + 11);
-    ctx.moveTo(L.x.x + 11, L.x.y - 11); ctx.lineTo(L.x.x - 11, L.x.y + 11); ctx.stroke();
-    ctx.fillStyle = "rgba(196,90,74,0.75)"; ctx.font = "11px IBM Plex Mono"; ctx.textAlign = "center";
-    ctx.fillText("discard egg nucleus", L.x.x, L.x.y + 36);
-    ctx.fillStyle = "rgba(16,22,28,0.55)";
-    ctx.beginPath();
-    ctx.roundRect?.(L.tube.x - 28, L.tube.y - 52, 56, 100, 10);
-    if (!ctx.roundRect) { ctx.fillRect(L.tube.x - 28, L.tube.y - 52, 56, 100); }
-    else ctx.fill();
-    ctx.strokeStyle = "rgba(160,200,230,0.55)"; ctx.lineWidth = 2;
-    ctx.strokeRect(L.tube.x - 28, L.tube.y - 52, 56, 100);
-    ctx.fillStyle = "rgba(180,210,230,0.7)";
-    ctx.fillText("fusion chamber", L.tube.x, L.tube.y + 64);
-    ctx.textAlign = "start";
-    if (this.state === "pulse" || this.spark > 0.05) {
-      const a = 0.25 + this.spark * 0.6 + (this.state === "pulse" ? Math.sin(t * 14) * 0.2 : 0);
-      ctx.strokeStyle = `rgba(160,220,255,${a})`;
-      ctx.beginPath(); ctx.arc(L.tube.x, L.tube.y, 34 + (t % 1) * 16, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = `rgba(255,240,200,${a})`;
-      for (let i = 0; i < 6; i++) {
-        const ang = t * 8 + i;
-        ctx.beginPath();
-        ctx.moveTo(L.tube.x + Math.cos(ang) * 10, L.tube.y + Math.sin(ang) * 10);
-        ctx.lineTo(L.tube.x + Math.cos(ang) * 28, L.tube.y + Math.sin(ang) * 28);
-        ctx.stroke();
+  drawBench(ctx, L, ph) {
+    if (ph === "womb") {
+      if (this.state === "birth") {
+        ctx.fillStyle = "rgba(142,224,184,0.8)"; ctx.font = "13px IBM Plex Sans"; ctx.textAlign = "center";
+        ctx.fillText("white face · click Dolly to read barcodes", (L.surr.x + L.dolly.x) / 2, L.surr.y - 86);
+        ctx.textAlign = "start";
+      } else {
+        ctx.fillStyle = "rgba(180,210,230,0.5)"; ctx.font = "11px IBM Plex Mono";
+        ctx.fillText(this.cleave >= 2 ? "drag embryo → uterus" : "cleavage in progress", L.surr.x - 150, L.surr.y - 86);
       }
+      return;
     }
+    ctx.fillStyle = "rgba(16,22,28,0.28)";
+    const bx = Math.min(L.x.x, L.tube.x) - 78, by = L.x.y - 64;
+    const bw = Math.abs(L.tube.x - L.x.x) + 168, bh = 140;
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 14); ctx.fill(); }
+    else ctx.fillRect(bx, by, bw, bh);
+
+    ctx.fillStyle = "rgba(180,70,60,0.16)";
+    ctx.beginPath(); ctx.arc(L.x.x, L.x.y, 24, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#c45a4a"; ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(L.x.x - 9, L.x.y - 9); ctx.lineTo(L.x.x + 9, L.x.y + 9);
+    ctx.moveTo(L.x.x + 9, L.x.y - 9); ctx.lineTo(L.x.x - 9, L.x.y + 9); ctx.stroke();
+    ctx.fillStyle = "rgba(196,90,74,0.8)"; ctx.font = "11px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("haploid nucleus out", L.x.x, L.x.y + 40);
+
+    ctx.fillStyle = "rgba(8,14,20,0.7)";
+    ctx.fillRect(L.tube.x - 30, L.tube.y - 44, 60, 88);
+    ctx.strokeStyle = "rgba(160,210,240,0.6)"; ctx.lineWidth = 2;
+    ctx.strokeRect(L.tube.x - 30, L.tube.y - 44, 60, 88);
+    const pulseOn = this.state === "pulse" || this.spark > 0.05;
+    ctx.fillStyle = pulseOn ? "rgba(140,210,255,0.95)" : "rgba(90,110,130,0.85)";
+    ctx.fillRect(L.tube.x - 44, L.tube.y - 30, 12, 60);
+    ctx.fillRect(L.tube.x + 32, L.tube.y - 30, 12, 60);
+    ctx.fillStyle = "rgba(180,210,230,0.75)";
+    ctx.fillText("electrofusion", L.tube.x, L.tube.y + 58);
+    ctx.textAlign = "start";
+    if (pulseOn) {
+      const a = 0.3 + this.spark * 0.65 + (this.state === "pulse" ? Math.sin(t * 16) * 0.2 : 0);
+      ctx.strokeStyle = `rgba(160,220,255,${a})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(L.tube.x, L.tube.y, 38 + (t % 1) * 8, 0, Math.PI * 2); ctx.stroke();
+    }
+  },
+  drawMatch(ctx, L) {
+    const ok = this.state === "done";
+    this.plate(ctx, L.finn.x, L.finn.y + 92, "nuclear DNA", "somatic donor", ok);
+    this.plate(ctx, L.eggE.x, L.eggE.y + 92, "cytoplasm", "mitochondria stay", false);
+    this.plate(ctx, L.surr.x, L.surr.y + 92, "uterus", "not the genome", false);
+    this.plate(ctx, L.dolly.x, L.dolly.y + 86, "clone", "mitotic copy", ok);
+    ctx.strokeStyle = ok ? "rgba(142,224,184,0.7)" : "rgba(232,210,160,0.4)";
+    ctx.setLineDash(ok ? [] : [6, 5]); ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(L.finn.x, L.finn.y + 88);
+    ctx.lineTo(L.dolly.x, L.dolly.y - 48);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = ok ? "rgba(142,224,184,0.92)" : "rgba(232,210,160,0.9)";
+    ctx.font = "13px IBM Plex Sans"; ctx.textAlign = "center";
+    ctx.fillText(ok ? "Same nuclear barcode. Different cytoplasm and uterus." : "Whose nuclear barcode did mitosis copy?", L.w * 0.5, L.h * 0.18);
+    ctx.textAlign = "start";
   },
   drawBits(ctx) {
     if (this.soma && !this.soma.gone) {
-      drawCell(ctx, { x: this.soma.x, y: this.soma.y, r: 22, t, kind: "soma", showNuc: true, hot: this.state === "transfer" });
-      ctx.fillStyle = "rgba(232,180,200,0.9)"; ctx.font = "11px IBM Plex Sans";
-      ctx.fillText("mammary nucleus", this.soma.x - 40, this.soma.y - 28);
+      if (this.state === "starve") this.drawCycle(ctx, this.soma.x, this.soma.y);
+      drawCell(ctx, {
+        x: this.soma.x, y: this.soma.y, r: 24 - this.starveT * 5, t, kind: "soma",
+        showNuc: true, hot: this.state === "transfer" || this.state === "starve",
+        pulse: this.state === "starve" ? this.starveT * 0.45 : 0
+      });
+      this.barcode(ctx, this.soma.x, this.soma.y - 58, FINN_DNA);
+      ctx.fillStyle = "rgba(232,180,200,0.95)"; ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText(this.starved ? "G0 diploid nucleus" : "mammary · leaving cycle", this.soma.x, this.soma.y - 72);
+      ctx.textAlign = "start";
+    }
+    if ((this.state === "enuc" || this.drag?.id === "nucE") && this.nucE && !this.nucE.gone) {
+      this.drawPipette(ctx, this.nucE.x, this.nucE.y);
+    }
+    if (this.state === "transfer" && this.soma && !this.soma.gone) {
+      this.drawPipette(ctx, this.soma.x, this.soma.y);
     }
     if (this.egg && !this.egg.gone) {
-      drawCell(ctx, { x: this.egg.x, y: this.egg.y, r: 32, t, kind: "egg", showNuc: !(this.nucE && this.nucE.gone), hot: this.state === "enuc" || this.state === "transfer" });
+      drawCell(ctx, { x: this.egg.x, y: this.egg.y, r: 36, t, kind: "egg", showNuc: !(this.nucE && this.nucE.gone), hot: this.state === "enuc" || this.state === "transfer" });
+      this.drawMito(ctx, this.egg.x, this.egg.y, 36);
+      ctx.fillStyle = "rgba(210,140,90,0.85)"; ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
+      ctx.fillText("Blackface cytoplasm", this.egg.x, this.egg.y + 52);
+      ctx.textAlign = "start";
     }
     if (this.nucE && !this.nucE.gone) {
-      ctx.beginPath(); ctx.arc(this.nucE.x, this.nucE.y, 10, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(this.nucE.x, this.nucE.y, 11, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(120,90,210,0.95)"; ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.stroke();
-      ctx.fillStyle = "rgba(180,160,230,0.9)"; ctx.font = "11px IBM Plex Sans";
-      ctx.fillText("egg nucleus", this.nucE.x + 14, this.nucE.y - 8);
+      ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.stroke();
+      this.barcode(ctx, this.nucE.x, this.nucE.y - 26, BF_DNA);
+      ctx.fillStyle = "rgba(180,160,230,0.95)"; ctx.font = "11px IBM Plex Sans";
+      ctx.fillText("egg nucleus", this.nucE.x + 16, this.nucE.y - 8);
     }
     if (this.recon && !this.recon.gone) {
-      drawCell(ctx, { x: this.recon.x, y: this.recon.y, r: 32, t, kind: "egg", showNuc: true, pulse: this.spark, hot: this.state === "tube" || this.state === "pulse" });
-      ctx.fillStyle = "rgba(224,180,120,0.9)"; ctx.font = "11px IBM Plex Sans";
-      ctx.fillText("reconstructed oocyte", this.recon.x - 52, this.recon.y - 40);
+      drawCell(ctx, { x: this.recon.x, y: this.recon.y, r: 36, t, kind: "egg", showNuc: true, pulse: this.spark, hot: this.state === "tube" || this.state === "pulse" });
+      this.drawMito(ctx, this.recon.x, this.recon.y, 36);
+      this.barcode(ctx, this.recon.x, this.recon.y - 62, FINN_DNA);
+      ctx.fillStyle = "rgba(224,180,120,0.95)"; ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText("Finn nucleus in Blackface egg", this.recon.x, this.recon.y - 76);
+      if (this.state === "pulse") {
+        ctx.fillStyle = "rgba(160,220,255,0.9)";
+        ctx.fillText("pulse → mitosis, not new genes", this.recon.x, this.recon.y + 58);
+        drawHelix(ctx, this.recon.x - 48, this.recon.y + 72, 96, t, true);
+      }
+      ctx.textAlign = "start";
     }
     if (this.embryo && !this.embryo.gone) {
-      const n = 4;
+      const n = Math.max(1, Math.min(8, 1 << Math.floor(this.cleave)));
+      ctx.strokeStyle = "rgba(240,210,170,0.35)"; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(this.embryo.x, this.embryo.y, 22 + n, 0, Math.PI * 2); ctx.stroke();
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2 + t * 0.2;
-        drawCell(ctx, { x: this.embryo.x + Math.cos(a) * 12, y: this.embryo.y + Math.sin(a) * 12, r: 11, t, kind: "soma", showNuc: true });
+        const rad = n === 1 ? 0 : 8 + n;
+        drawCell(ctx, { x: this.embryo.x + Math.cos(a) * rad, y: this.embryo.y + Math.sin(a) * rad, r: n > 4 ? 8 : 12, t, kind: "soma", showNuc: true });
       }
-      ctx.fillStyle = "rgba(230,200,140,0.9)"; ctx.font = "11px IBM Plex Sans";
-      ctx.fillText("embryo  ·  donor nuclear DNA", this.embryo.x - 70, this.embryo.y - 28);
+      this.barcode(ctx, this.embryo.x, this.embryo.y - 52, FINN_DNA);
+      ctx.fillStyle = "rgba(230,200,140,0.95)"; ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText(n + "-cell  ·  mitotic copies", this.embryo.x, this.embryo.y - 66);
+      if (this.cleave < 2) {
+        ctx.fillStyle = "rgba(224,180,120,0.9)";
+        ctx.fillText("wait for 4–8 cells", this.embryo.x, this.embryo.y + 44);
+      } else {
+        ctx.fillStyle = "rgba(142,224,184,0.9)";
+        ctx.fillText("ready to implant", this.embryo.x, this.embryo.y + 44);
+      }
+      ctx.textAlign = "start";
     }
   },
   down(p) {
     const L = this.layout();
     if (inspect) {
-      if (this.hit(p, L.finn)) callout("Finn-Dorset", "Mammary / nuclear donor. Dolly’s nuclear DNA matches this ewe — not the Blackface.", p.x, p.y);
-      else if (this.hit(p, L.eggE)) callout("Blackface egg donor", "Unfertilised egg. Cytoplasm and mitochondria. Nucleus must be removed.", p.x, p.y);
-      else if (this.hit(p, L.surr)) callout("Surrogate", "Blackface uterus. She is not the nuclear parent.", p.x, p.y);
-      else if (this.born && this.hit(p, L.dolly)) callout("Dolly", "White-faced like the Finn-Dorset. Nuclear DNA from the mammary cell, copied by mitosis.", p.x, p.y);
+      if (this.hit(p, L.finn) && (this.phase() === "donor" || this.phase() === "pair" || this.phase() === "compare")) callout("Finn-Dorset", "Mammary / nuclear donor. Dolly’s nuclear DNA is a mitotic copy of this ewe — not the Blackface.", p.x, p.y);
+      else if (this.hit(p, L.eggE) && (this.phase() === "pair" || this.phase() === "compare")) callout("Blackface egg donor", "Unfertilised egg. Cytoplasm and mitochondria remain after the haploid nucleus is discarded.", p.x, p.y);
+      else if (this.hit(p, L.surr) && (this.phase() === "womb" || this.phase() === "compare")) callout("Surrogate", "Blackface uterus. She is not the nuclear parent. Her barcode stays Blackface.", p.x, p.y);
+      else if (this.born && this.hit(p, L.dolly)) callout("Dolly", "White-faced like the Finn-Dorset. Nuclear DNA from the G0 mammary cell, copied by mitosis. Pulse did not write genes.", p.x, p.y);
+      else if (this.egg && !this.egg.gone && dist(p, this.egg) < 48) callout("Cytoplasm", "Mitochondria are in the egg cytoplasm. They do not decide the nuclear barcode.", p.x, p.y);
       else hideCallout();
       return;
     }
+    if (this.state === "birth" && (this.hit(p, L.dolly) || this.hit(p, L.surr))) {
+      this.state = "who"; audio.ok();
+      NB.add("dolly", "Barcode lineup. Nuclear DNA is the test, not who gave birth.");
+      return;
+    }
     if (this.state === "soma" && this.hit(p, L.finn)) {
-      this.soma = { x: L.finn.x + 48, y: L.finn.y + 6, r: 16 }; this.state = "egg"; audio.ok();
-      NB.add("dolly", "Mammary cell taken from Finn-Dorset."); return;
+      this.soma = { x: L.finn.x + 140, y: L.finn.y, r: 16 }; this.state = "starve"; audio.ok();
+      const s = $("#dStarve"); if (s) s.disabled = false;
+      NB.add("dolly", "Mammary cell taken from Finn-Dorset. Serum-starve to G0."); return;
     }
     if (this.state === "egg" && this.hit(p, L.eggE)) {
-      this.egg = { x: L.eggE.x - 56, y: L.eggE.y + 8, r: 22 };
-      this.nucE = { x: this.egg.x - 4, y: this.egg.y - 4, r: 8 }; this.state = "enuc"; audio.ok();
+      this.state = "enuc";
+      const B = this.layout();
+      this.egg = { x: B.x.x + 90, y: B.x.y, r: 22 };
+      this.nucE = { x: this.egg.x - 4, y: this.egg.y - 4, r: 8 };
+      this.mito = Array.from({ length: 8 }, (_, i) => ({ a: (i / 8) * Math.PI * 2, d: 2 + (i % 3) * 3 }));
+      if (this.soma && !this.soma.gone) { this.soma.x = B.x.x - 90; this.soma.y = B.x.y; }
+      audio.ok();
       NB.add("dolly", "Unfertilised Blackface egg collected."); return;
     }
     if (this.state === "who") {
@@ -764,6 +1568,8 @@ const Dolly = {
         toast("Correct. Nuclear DNA = mammary donor. Surrogate provided the uterus.", "");
         return;
       }
+      if (this.born && this.hit(p, L.dolly)) return this.fail("Dolly is the clone. Click the ewe whose nucleus she copied — the Finn-Dorset.");
+      if (this.hit(p, L.eggE) || this.hit(p, L.surr)) return this.fail("Blackface barcode is cytoplasm / uterus. Nuclear DNA matches the somatic donor.");
       return this.fail("Nuclear DNA matches the somatic donor, not the egg donor or surrogate.");
     }
     const items = ["embryo", "recon", "soma", "egg", "nucE"];
@@ -781,8 +1587,9 @@ const Dolly = {
       if (dist(this.nucE, L.x) < 40) {
         this.nucE.gone = true; this.state = "transfer"; audio.ok();
         NB.add("dolly", "Egg enucleated. Cytoplasm retained.");
-      } else this.fail("Discard the egg nucleus on the red X.");
+      } else this.fail("Discard the egg nucleus on the red X so genomes do not mix.");
     } else if (id === "soma" && this.state === "transfer") {
+      if (!this.starved) return this.fail("Serum-starve the mammary cell first. Dolly’s donor was in G0.");
       if (this.egg && dist(this.soma, this.egg) < 36) {
         this.recon = { x: this.egg.x, y: this.egg.y, r: 22 };
         this.soma.gone = true; this.egg.gone = true; this.state = "tube"; audio.ok();
@@ -793,40 +1600,60 @@ const Dolly = {
         this.recon.x = L.tube.x; this.recon.y = L.tube.y;
         this.state = "pulse";
         const b = $("#dPulse"); if (b) b.disabled = false;
-        audio.ok(); NB.add("dolly", "Reconstructed oocyte in fusion chamber.");
-      } else this.fail("The reconstructed egg must enter the fusion chamber.");
+        audio.ok(); NB.add("dolly", "Reconstructed oocyte between fusion electrodes.");
+      } else this.fail("The reconstructed egg must sit between the electrodes.");
     } else if (id === "embryo" && this.state === "implant") {
+      if (this.cleave < 2) return this.fail("Wait. Mitosis must copy the donor nucleus to 4–8 cells before implant.");
       if (this.hit(this.embryo, L.surr)) {
-        this.embryo.gone = true; this.born = true; this.state = "who"; audio.ok();
-        NB.add("dolly", "Embryo implanted in Blackface surrogate.");
-        toast("Lamb born. Now click whose nuclear DNA she matches.", "");
-      } else this.fail("Implant the embryo in the surrogate.");
+        this.embryo.gone = true; this.born = true; this.state = "birth"; audio.ok();
+        NB.add("dolly", "Embryo implanted in Blackface surrogate. Lamb born.");
+        toast("White face like the nuclear donor. Next: match the barcode, not the ewe who carried her.", "");
+      } else this.fail("Implant the embryo in the Blackface surrogate.");
     }
   },
   activate() {
     if (this.state !== "pulse") return;
     this.spark = 1;
-    this.embryo = { x: this.layout().tube.x + 48, y: this.layout().tube.y, r: 16 };
+    this.cleave = 0;
     if (this.recon) this.recon.gone = true;
     this.state = "implant";
+    const W = this.layout();
+    this.embryo = { x: W.surr.x - 150, y: W.surr.y, r: 16 };
     audio.ok();
     NB.add("dolly", "Pulse applied. Mitosis copies donor nuclear DNA.");
-    toast("Embryo forming. The pulse did not add genes.", "");
+    toast("Mitosis copies the donor nucleus. No genes were added by the current.", "");
+  },
+  starve() {
+    if (this.state !== "starve") return;
+    this.starved = true;
+    this.starveT = 1;
+    this.state = "egg";
+    const s = $("#dStarve"); if (s) s.disabled = true;
+    audio.ok();
+    NB.add("dolly", "Mammary cell quiescent (G0). Ready for nuclear transfer.");
+    toast("G0. Now collect the Blackface egg.", "");
   }
 };
 function bindDollyDock() {
-  const b = $("#dPulse"); let h;
-  b.addEventListener("pointerdown", (e) => {
-    e.stopPropagation(); if (b.disabled) return;
-    let n = 0;
-    h = setInterval(() => {
-      n += 5;
-      b.querySelector("i").style.width = n + "%";
-      if (n >= 100) { clearInterval(h); Dolly.activate(); }
-    }, 36);
-  });
-  b.addEventListener("pointerup", () => { clearInterval(h); });
-  b.addEventListener("pointerleave", () => clearInterval(h));
+  const hold = (sel, fn) => {
+    const b = document.querySelector(sel); if (!b) return;
+    let h;
+    b.addEventListener("pointerdown", (e) => {
+      e.stopPropagation(); if (b.disabled) return;
+      if (sel === "#dStarve") Dolly.holdingStarve = true;
+      let n = 0;
+      h = setInterval(() => {
+        n += 5;
+        const i = b.querySelector("i"); if (i) i.style.width = n + "%";
+        if (sel === "#dStarve") Dolly.starveT = Math.min(1, n / 100);
+        if (n >= 100) { clearInterval(h); Dolly.holdingStarve = false; fn(); }
+      }, 36);
+    });
+    b.addEventListener("pointerup", () => { clearInterval(h); Dolly.holdingStarve = false; });
+    b.addEventListener("pointerleave", () => { clearInterval(h); Dolly.holdingStarve = false; });
+  };
+  hold("#dPulse", () => Dolly.activate());
+  hold("#dStarve", () => Dolly.starve());
 }
 
 /* ---------- PLANT ---------- */

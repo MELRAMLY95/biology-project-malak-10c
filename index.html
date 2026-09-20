@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CLONING · Biotechnology Exhibit · 4BI1</title>
+  <title>CLONING · Malak S2 · 4BI1</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/exhibit.css" />
+  <link rel="stylesheet" href="css/exhibit.css?v=29" />
   <script type="importmap">
   {
     "imports": {
@@ -24,6 +24,7 @@
 
   <nav id="rail" hidden>
     <p class="mark">4BI1</p>
+    <p class="name">Malak <span class="s2">S2</span></p>
     <button type="button" data-go="learn">Learn</button>
     <button type="button" data-go="define">Definition</button>
     <button type="button" data-go="dolly">Dolly 1996</button>
@@ -42,6 +43,7 @@
     <p class="mark">Edexcel International GCSE Biology</p>
     <h1>Cloning</h1>
     <p class="sub">Creating genetically identical organisms</p>
+    <p class="by">Malak <span class="s2">S2</span></p>
     <p class="fine" id="introHint">Look. The camera is entering a living cell.</p>
     <button type="button" id="enter" hidden>Enter the laboratory</button>
   </section>
@@ -58,6 +60,7 @@
         <button type="button" id="btnHint">Hint</button>
         <button type="button" id="btnProc">Procedure</button>
         <button type="button" id="btnNote">Notebook</button>
+        <button type="button" id="btnProg">Progress</button>
         <button type="button" id="btnSound">Sound</button>
         <button type="button" id="btnReset">Reset</button>
       </div>
@@ -79,6 +82,7 @@
           <p class="mark" id="learnNo">01 / 34</p>
           <p class="ethSpec" id="learnSpec">Edexcel 4BI1</p>
         </div>
+        <p class="name">Malak <span class="s2">S2</span></p>
         <div class="bar" id="learnBar"><i></i></div>
       </header>
       <h2 id="learnTitle">What is cloning?</h2>
@@ -102,6 +106,7 @@
     <header class="quizHead">
       <div>
         <p class="mark" id="quizProg">Question 1 / 10</p>
+        <p class="name">Malak <span class="s2">S2</span></p>
         <p class="quizScore" id="quizScore">Score 0</p>
       </div>
       <div class="bar" id="quizBar"><i></i></div>
@@ -118,6 +123,7 @@
 
   <article id="examPad" class="panel exam" hidden>
     <p class="mark" id="examMeta">Question 01</p>
+    <p class="name">Malak <span class="s2">S2</span></p>
     <h2 id="examQ">Loading…</h2>
     <div class="padwrap">
       <textarea id="examWrite" placeholder="Start typing your answer…"></textarea>
@@ -136,12 +142,14 @@
 
   <article id="glossPad" class="panel" hidden>
     <p class="mark">Glossary</p>
+    <p class="name">Malak <span class="s2">S2</span></p>
     <div id="glossList" class="gloss"></div>
     <div id="glossDef"></div>
   </article>
 
   <article id="ethicsPad" class="panel ethics" hidden>
     <p class="mark" id="ethProg">Case 01 / 08</p>
+    <p class="name">Malak <span class="s2">S2</span></p>
     <div class="bar" id="ethBar"><i></i></div>
     <div id="ethNav" class="eth-nav"></div>
     <p class="ethSpec" id="ethSpec"></p>
@@ -190,9 +198,11 @@
     <ul id="nbList"></ul>
   </aside>
 
+  <p id="credit" class="name">Malak <span class="s2">S2</span></p>
+
   <div id="toast" hidden></div>
 
   <script src="js/data/exam.js"></script>
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=29"></script>
 </body>
 </html>

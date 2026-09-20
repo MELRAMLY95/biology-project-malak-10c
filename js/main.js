@@ -1,9 +1,9 @@
-import { $, $$, audio, toast, NB } from "./core.js";
-import { initWorld, skipIntro, setWorld } from "./world3d.js";
-import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js";
+import { $, $$, audio, toast, NB } from "./core.js?v=29";
+import { initWorld, skipIntro, setWorld } from "./world3d.js?v=29";
+import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js?v=29";
 import {
   bindLearnUi, showLearn, showQuiz, showExam, showGlossary, renderProgress, learnDelta, showEthics, ethDelta
-} from "./ui.js";
+} from "./ui.js?v=29";
 
 const gl = document.getElementById("gl");
 const sim = document.getElementById("sim");
@@ -33,7 +33,7 @@ $$("#rail button").forEach((b) => {
 
 $("#hud").addEventListener("pointerdown", (e) => e.stopPropagation());
 $("#rail").addEventListener("pointerdown", (e) => e.stopPropagation());
-["learnPad", "quizPad", "examPad", "glossPad", "ethicsPad", "notebook", "toast"].forEach((id) => {
+["learnPad", "quizPad", "examPad", "glossPad", "ethicsPad", "notebook", "toast", "progPad"].forEach((id) => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("pointerdown", (e) => e.stopPropagation());
 });
@@ -54,7 +54,7 @@ function enter(id) {
   $("#examPad").hidden = id !== "exam";
   $("#glossPad").hidden = id !== "glossary";
   $("#ethicsPad").hidden = id !== "ethics";
-  $("#progPad").hidden = id === "intro" || id === "quiz" || id === "exam" || id === "ethics" || id === "learn";
+  $("#progPad").hidden = true;
   if (id === "learn") showLearn();
   if (id === "quiz") showQuiz();
   if (id === "exam") showExam();
@@ -91,6 +91,7 @@ $("#btnInspect").onclick = (e) => { e.stopPropagation(); setInspect($("#btnInspe
 $("#btnHint").onclick = (e) => { e.stopPropagation(); hint(); };
 $("#btnProc").onclick = (e) => { e.stopPropagation(); procedure(); };
 $("#btnNote").onclick = (e) => { e.stopPropagation(); $("#notebook").hidden = !$("#notebook").hidden; NB.render(); };
+$("#btnProg").onclick = (e) => { e.stopPropagation(); $("#progPad").hidden = !$("#progPad").hidden; renderProgress(); };
 $("#btnSound").onclick = (e) => { e.stopPropagation(); $("#btnSound").textContent = audio.toggle() ? "Sound on" : "Sound"; };
 $("#btnReset").onclick = (e) => { e.stopPropagation(); resetActive(); };
 
