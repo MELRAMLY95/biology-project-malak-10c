@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/exhibit.css?v=30" />
+  <link rel="stylesheet" href="css/exhibit.css?v=37" />
   <script type="importmap">
   {
     "imports": {
@@ -96,13 +96,13 @@
         <p class="name">Malak <span class="s2">S2</span></p>
         <div class="bar" id="learnBar"><i></i></div>
       </header>
-      <h2 id="learnTitle">What is cloning?</h2>
-      <div id="learnBody" class="learnProse"></div>
-      <aside id="learnRemember" class="learnRemember" hidden>
-        <p class="mark">Hold this for the exam</p>
-        <p id="learnHold"></p>
-      </aside>
       <div id="learnChips" class="chips"></div>
+      <h2 id="learnTitle">What is cloning?</h2>
+      <p class="learnPin" id="learnRemember" hidden>
+        <span class="mark">Exam hold</span>
+        <span id="learnHold"></span>
+      </p>
+      <div id="learnBody" class="learnProse"></div>
       <div class="row learnActions">
         <button type="button" id="learnPrev">Previous</button>
         <button type="button" id="learnNext">Next</button>
@@ -214,6 +214,6 @@
   <div id="toast" hidden></div>
 
   <script src="js/data/exam.js"></script>
-  <script type="module" src="js/main.js?v=30"></script>
+  <script type="module" src="js/main.js?v=37"></script>
 </body>
 </html>

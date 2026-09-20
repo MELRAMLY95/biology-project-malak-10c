@@ -1,5 +1,5 @@
-import { $, $$, toast, audio, store, NB } from "./core.js";
-import { LESSONS, GLOSSARY, ETHICS } from "./content.js";
+import { $, $$, toast, audio, store, NB } from "./core.js?v=37";
+import { LESSONS, GLOSSARY, ETHICS, DEPTH } from "./content.js?v=37";
 
 const PKEY = "progress";
 export function progress() {
@@ -87,16 +87,33 @@ const SPEC = {
 };
 export function showLearn() {
   const L = LESSONS[li];
+  const D = DEPTH[L.id] || {};
   markConcept(L.id);
   $("#learnNo").textContent = String(li + 1).padStart(2, "0") + " / " + LESSONS.length;
-  $("#learnSpec").textContent = SPEC[L.try] || "Edexcel International GCSE Biology 4BI1";
+  $("#learnSpec").textContent = D.spec || SPEC[L.try] || "Edexcel International GCSE Biology 4BI1";
   $("#learnBar i").style.width = ((li + 1) / LESSONS.length * 100) + "%";
   $("#learnTitle").textContent = L.title;
   const bits = L.body.split(/(?<=\.)\s+/).filter(Boolean);
-  $("#learnBody").innerHTML = bits.map((s, i) => `<p style="animation-delay:${0.05 + i * 0.07}s">${s}</p>`).join("");
-  const hold = HOLD[L.id] || L.body;
-  $("#learnRemember").hidden = false;
-  $("#learnHold").textContent = hold;
+  const lead = bits[0] || L.body;
+  const rest = bits.slice(1);
+  const cards = [];
+  if (D.why) cards.push(`<article class="learnCard why"><p class="mark">Why this happens</p><p>${D.why}</p></article>`);
+  if (D.myth) cards.push(`<article class="learnCard myth"><p class="mark">Watch this trap</p><p>${D.myth}</p></article>`);
+  if (D.app) cards.push(`<article class="learnCard app"><p class="mark">In the world</p><p>${D.app}</p></article>`);
+  const board = [];
+  if (D.diagram) board.push(`<figure class="learnDiag">${D.diagram}</figure>`);
+  if (cards.length) board.push(`<div class="learnCards">${cards.join("")}</div>`);
+  if (D.table) {
+    board.push(`<div class="learnTableWrap"><table class="learnTable">${D.table.map((row, i) => `<tr>${row.map((c) => i ? `<td>${c}</td>` : `<th>${c}</th>`).join("")}</tr>`).join("")}</table></div>`);
+  }
+  if (D.exam) board.push(`<blockquote class="learnExamQ"><p class="mark">Write this</p><p>${D.exam}</p></blockquote>`);
+  $("#learnBody").innerHTML =
+    `<p class="learnLede">${lead}</p>` +
+    (rest.length ? `<div class="learnRest">${rest.map((s) => `<p>${s}</p>`).join("")}</div>` : "") +
+    (board.length ? `<div class="learnBoard">${board.join("")}</div>` : "");
+  const hold = HOLD[L.id];
+  $("#learnRemember").hidden = !hold;
+  $("#learnHold").textContent = hold || "";
   const chips = {
     define: ["nuclear DNA", "mitosis", "phenotype ≠ genotype"],
     plant: ["5.17B / 5.18B", "explant", "sterilise", "totipotent"],
@@ -120,7 +137,7 @@ export function showLearn() {
       `<button type="button" data-li="${i}"><span>${String(i + 1).padStart(2, "0")}</span>${x.title}</button>`
     ).join("");
     $$("#learnRail button").forEach((b) => {
-      b.onclick = (e) => { e.stopPropagation(); li = Number(b.dataset.li); showLearn(); };
+      b.onclick = (e) => { e.stopPropagation(); audio.click(); li = Number(b.dataset.li); showLearn(); };
     });
   }
   $$("#learnRail button").forEach((b, i) => b.classList.toggle("on", i === li));
@@ -188,6 +205,7 @@ export function showQuiz() {
       e.stopPropagation();
       if (qLocked) return;
       picked = Number(b.dataset.i);
+      audio.click();
       $$("#quizOpts .opt").forEach((x) => x.classList.toggle("on", x === b));
     };
   });

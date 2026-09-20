@@ -1,9 +1,9 @@
-import { $, $$, audio, toast, NB } from "./core.js?v=30";
-import { initWorld, skipIntro, setWorld } from "./world3d.js?v=30";
-import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js?v=30";
+import { $, $$, audio, toast, NB } from "./core.js?v=37";
+import { initWorld, skipIntro, setWorld } from "./world3d.js?v=37";
+import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js?v=37";
 import {
   bindLearnUi, showLearn, showQuiz, showExam, showGlossary, renderProgress, learnDelta, showEthics, ethDelta
-} from "./ui.js?v=30";
+} from "./ui.js?v=37";
 
 const gl = document.getElementById("gl");
 const sim = document.getElementById("sim");
@@ -25,10 +25,10 @@ window.addEventListener("intro-complete", () => {
   $("#introHint").textContent = "You are inside the cell. Nuclear DNA is what cloning copies.";
 });
 
-$("#enter").addEventListener("click", (e) => { e.stopPropagation(); enter("learn"); });
+$("#enter").addEventListener("click", (e) => { e.stopPropagation(); audio.click(); enter("learn"); });
 
 $$("#rail button").forEach((b) => {
-  b.addEventListener("click", (e) => { e.stopPropagation(); enter(b.dataset.go); });
+  b.addEventListener("click", (e) => { e.stopPropagation(); audio.click(); enter(b.dataset.go); });
 });
 
 $("#hud").addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -87,13 +87,18 @@ sim.addEventListener("wheel", (e) => {
   pointer("wheel", { clientX: e.clientX, clientY: e.clientY, delta: e.deltaY });
 }, { passive: false });
 
-$("#btnInspect").onclick = (e) => { e.stopPropagation(); setInspect($("#btnInspect").classList.toggle("on")); };
-$("#btnHint").onclick = (e) => { e.stopPropagation(); hint(); };
-$("#btnProc").onclick = (e) => { e.stopPropagation(); procedure(); };
-$("#btnNote").onclick = (e) => { e.stopPropagation(); $("#notebook").hidden = !$("#notebook").hidden; NB.render(); };
-$("#btnProg").onclick = (e) => { e.stopPropagation(); $("#progPad").hidden = !$("#progPad").hidden; renderProgress(); };
-$("#btnSound").onclick = (e) => { e.stopPropagation(); $("#btnSound").textContent = audio.toggle() ? "Sound on" : "Sound"; };
-$("#btnReset").onclick = (e) => { e.stopPropagation(); resetActive(); };
+$("#btnInspect").onclick = (e) => { e.stopPropagation(); audio.click(); setInspect($("#btnInspect").classList.toggle("on")); };
+$("#btnHint").onclick = (e) => { e.stopPropagation(); audio.click(); hint(); };
+$("#btnProc").onclick = (e) => { e.stopPropagation(); audio.click(); procedure(); };
+$("#btnNote").onclick = (e) => { e.stopPropagation(); audio.click(); $("#notebook").hidden = !$("#notebook").hidden; NB.render(); };
+$("#btnProg").onclick = (e) => { e.stopPropagation(); audio.click(); $("#progPad").hidden = !$("#progPad").hidden; renderProgress(); };
+$("#btnSound").onclick = (e) => {
+  e.stopPropagation();
+  const on = audio.toggle();
+  $("#btnSound").textContent = on ? "Sound on" : "Sound";
+  $("#btnSound").classList.toggle("on", on);
+};
+$("#btnReset").onclick = (e) => { e.stopPropagation(); audio.click(); resetActive(); };
 
 bindLearnUi();
 

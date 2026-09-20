@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js";
+import { markSim } from "./ui.js?v=37";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js";
+} from "./core.js?v=37";
 
 const sim = $("#sim");
 let scene = "intro";
@@ -55,7 +55,7 @@ function clearSim() {
 
 function hudFor(id) {
   const map = {
-    define: ["Definition", "What is a clone?", "Copy nuclear DNA by mitosis. Same genes ≠ same phenotype. Then identify the clone."],
+    define: ["Definition", "What is a clone?", "Microscope bench. Copy nuclear DNA by mitosis. Same genes ≠ same phenotype. Then identify the clone."],
     learn: ["Curriculum", "Edexcel 4BI1 cloning", "Read, then try the lab, then answer."],
     quiz: ["Quiz", "Check your understanding", "Choose A–D, then submit."],
     exam: ["Exam pad", "Use mark-scheme language", "Nuclear DNA · mitosis · enucleated egg · surrogate."],
@@ -97,7 +97,7 @@ function dockFor(id) {
         <button type="button" data-spd="3">Fast</button>
       </div>
       <button type="button" id="implant" disabled>Transfer to surrogate</button>
-      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Grab the glass pipette, or click a nucleus to aim. Alignment ring turns green when you may release.</p>`;
+      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Grab the glass pipette, or click a nucleus to aim. Alignment ring turns green when you may release. After blastocyst, click the embryo to implant.</p>`;
     bindScntDock();
   } else if (id === "plant") {
     d.innerHTML = `
@@ -135,13 +135,15 @@ function dockFor(id) {
     bindDollyDock();
   } else if (id === "define") {
     d.innerHTML = `
-      <p id="defStep" style="color:var(--mute);font-size:12px;line-height:1.45">1 / 5  ·  Replicate the parent’s nuclear DNA. Do not empty the parent.</p>
+      <p id="defStep" style="color:var(--mute);font-size:12px;line-height:1.45">Find the parent nucleus under the objective. Click it to start S-phase.</p>
+      <label>Zoom <input id="defZoom" type="range" min="0.75" max="1.8" step="0.01" value="1.05" /></label>
+      <label>Focus <input id="defFocus" type="range" min="0" max="1" step="0.01" value="0.86" /></label>
       <button type="button" id="defRep">Replicate nuclear DNA</button>
       <button type="button" id="defMito" disabled>Run mitosis</button>
       <label>Clone B light <input id="defLight" type="range" min="8" max="100" value="82" disabled /></label>
       <label>Clone B nutrients <input id="defFood" type="range" min="8" max="100" value="78" disabled /></label>
       <button type="button" id="defStill" disabled>Still clones?</button>
-      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">A clone matches nuclear DNA. Mixing sperm and egg is sexual reproduction — not cloning.</p>`;
+      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Click the nucleus. Drag the sister copy. Do not drop gametes in. After mitosis, drag the lamp or pellet onto Clone B.</p>`;
     bindDefDock();
   } else if (id === "ethics" || id === "exam" || id === "quiz" || id === "learn" || id === "glossary") {
     d.innerHTML = "";
@@ -160,10 +162,10 @@ export function hint() {
   const h = {
     scnt: "Grab the glass pipette or click a nucleus to aim. Green ring = aligned — release to aspirate. Enucleate the egg before you seat the donor. Hold activate. Implant at blastocyst.",
     dolly: "Click Finn-Dorset → serum-starve the mammary cell (G0) → Blackface egg → discard egg nucleus → seat donor nucleus → electrodes → pulse (mitosis, not new DNA) → wait for cleavage → implant → match the barcode.",
-    plant: "Click the shoot, cut, sterilise, drag the explant into the vessel.",
-    bacteria: "Press Culture. DNA copies, the cell elongates, a septum splits it. Cold or starvation slows fission. Click to switch microscope and colony.",
-    transgenic: "Click the gold insulin gene — not haemoglobin or keratin. Carry it into the bacterium, then clone the host.",
-    define: "Replicate, then seat the sister nucleus. Mitosis copies DNA — gametes mix it. Change Clone B’s environment, then pick who matches the parent barcode.",
+    plant: "Click the parent shoot to cut. Sterilise. Drag the explant into the flask — unsterilised tissue contaminates the culture.",
+    bacteria: "Click the cell under the microscope to start fission. Cold or starvation slows it. Drag the temperature above ~48°C and proteins denature — Reset.",
+    transgenic: "Click INSULIN (not haemoglobin or keratin). Drag the cassette onto the host. Click the transgenic cell to clone, then collect protein.",
+    define: "Click the parent nucleus. Watch S-phase. Drag the sister copy into empty cytoplasm — not a gamete. After mitosis, drag lamp or food onto Clone B, then pick the matching barcode.",
     ethics: "There is no single correct click. Pick a stance, then steal exam language from both columns."
   };
   toast(h[scene] || "Explore the environment.", "");
@@ -177,7 +179,7 @@ export function procedure() {
     bacteria: "DNA replicates → cell elongates → septum → two clones",
     transgenic: "Identify human insulin gene → introduce into host genome → clone the host → insulin from the culture",
     ethics: "Name an advantage, a disadvantage, and who pays the cost. Never claim the pulse creates DNA.",
-    define: "1 Replicate nuclear DNA  2 Seat the sister nucleus  3 Mitosis  4 Change environment  5 Click the matching barcode"
+    define: "1 S-phase copies nuclear DNA  2 Seat sister nucleus  3 Mitosis (prophase → cytokinesis)  4 Change Clone B’s environment  5 Click the matching barcode"
   };
   toast(p[scene] || "No procedure sheet on this bench.", "");
 }
@@ -200,6 +202,23 @@ function status(s, acc) {
 
 function acc(m) { return Math.max(0, 100 - m * 8); }
 
+function coast(o, damp = 0.86) {
+  if (!o || o.held) return;
+  o.vx = (o.vx || 0) * damp;
+  o.vy = (o.vy || 0) * damp;
+  if (Math.abs(o.vx) < 0.05 && Math.abs(o.vy) < 0.05) { o.vx = 0; o.vy = 0; return; }
+  o.x += o.vx;
+  o.y += o.vy;
+}
+function snapRing(ctx, x, y, r, ok) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = ok ? "rgba(142,224,184,0.9)" : "rgba(212,180,138,0.25)";
+  ctx.lineWidth = ok ? 3 : 1.3;
+  ctx.setLineDash(ok ? [] : [6, 5]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 /* ---------- DEFINE ---------- */
 const BASES = ["#6ec4a0", "#e0b060", "#8eb4e0", "#c07ab0"];
 const PARENT_SEQ = [0, 1, 2, 0, 1, 2, 3, 1];
@@ -210,36 +229,40 @@ const Define = {
   state: "idle",
   mistakes: 0,
   mito: 0,
+  sProg: 0,
   grow: 0,
   light: 82,
   food: 78,
   tweaked: false,
   grab: null,
   order: [0, 1, 2],
+  zoom: 1.05,
+  focus: 0.86,
+  ox: 0, oy: 0,
   _hud: "",
   layout() {
     const w = innerWidth, h = innerHeight;
     return {
       w, h,
-      P: { x: w * 0.30, y: h * 0.46, r: 86 },
-      C: { x: w * 0.62, y: h * 0.46, r: 86 },
-      sperm: { x: w * 0.42, y: h * 0.72, r: 22 },
-      egg: { x: w * 0.54, y: h * 0.72, r: 28 }
+      P: { x: w * 0.34 + this.ox, y: h * 0.48 + this.oy, r: 92 },
+      C: { x: w * 0.64 + this.ox, y: h * 0.48 + this.oy, r: 92 },
+      sperm: { x: w * 0.42, y: h * 0.48 + Math.min(w, h) * 0.22, r: 22 },
+      egg: { x: w * 0.56, y: h * 0.48 + Math.min(w, h) * 0.22, r: 28 },
+      lamp: { x: w * 0.22, y: h * 0.72 },
+      pellet: { x: w * 0.78, y: h * 0.72 }
     };
   },
   reset(log) {
     const L = this.layout();
-    this.state = "idle";
-    this.mistakes = 0;
-    this.mito = 0;
-    this.grow = 0;
-    this.light = 82;
-    this.food = 78;
-    this.tweaked = false;
-    this.grab = null;
-    this.seated = false;
-    this.replicated = false;
-    this._hud = "";
+    Object.assign(this, {
+      state: "idle", mistakes: 0, mito: 0, sProg: 0, grow: 0, light: 82, food: 78,
+      tweaked: false, grab: null, seated: false, replicated: false, poisoned: false,
+      zoom: 1, focus: 0.88, ox: 0, oy: 0, draggingSample: false, _hud: "",
+      lamp: { x: L.lamp.x, y: L.lamp.y, vx: 0, vy: 0 },
+      pellet: { x: L.pellet.x, y: L.pellet.y, vx: 0, vy: 0 },
+      cam: { x: innerWidth / 2, y: innerHeight * 0.48, z: 1, f: 0.88 },
+      ptr: null, insertU: 0, morph: 0, dimple: 0, _now: performance.now()
+    });
     this.nuc = { x: L.P.x - 6, y: L.P.y - 5 };
     this.sis = null;
     this.gamS = { x: L.sperm.x, y: L.sperm.y, kind: "sperm" };
@@ -254,19 +277,35 @@ const Define = {
     const s = $("#defStill"); if (s) s.disabled = true;
     const li = $("#defLight"); if (li) { li.disabled = true; li.value = 82; }
     const f = $("#defFood"); if (f) { f.disabled = true; f.value = 78; }
-    if (log) NB.add("define", "Definition bench reset.");
+    const z = $("#defZoom"); if (z) z.value = this.zoom;
+    const fo = $("#defFocus"); if (fo) fo.value = this.focus;
+    if (log) NB.add("define", "Optical bench reset.");
   },
   steps() {
+    const ph = this.mitoPhase();
     return {
-      idle: "1 / 5  ·  Replicate the parent’s nuclear DNA. Cloning does not empty the parent.",
-      drag: "2 / 5  ·  Drag the sister nucleus into the empty cell — not a gamete.",
-      copy: "3 / 5  ·  Run mitosis. Every nucleus must match the parent barcode.",
-      mito: "Mitosis in progress — DNA is copied, not rewritten.",
-      env: "4 / 5  ·  Starve or shade Clone B. Phenotype can change. Nuclear DNA does not.",
-      who: "5 / 5  ·  Click the organism whose nuclear barcode matches the parent.",
+      idle: "Find the parent under the objective. Click its nucleus — S-phase copies DNA. The parent keeps its genome.",
+      sphase: "S-phase. Chromatids duplicating inside the parent nucleus. Do not pull the original out.",
+      drag: "Sister chromatid set ready. Drag the copy into the empty cytoplasm. Gametes mix genomes — they are not clones.",
+      copy: "Copy seated. Membrane sealing — then mitosis will share identical chromatids.",
+      insert: "Nucleus entering cytoplasm. Watch the membrane close.",
+      mito: "Mitosis · " + ph + " — DNA is copied and shared, not rewritten.",
+      env: "Same nuclear barcode. Drag the lamp or pellet onto Clone B. Phenotype can change.",
+      who: "Click the organism whose nuclear barcode matches the parent.",
       done: "Clone = same nuclear DNA, copied by mitosis. Same genes ≠ same phenotype."
     };
   },
+  mitoPhase() {
+    const u = this.mito;
+    if (u < 0.18) return "prophase";
+    if (u < 0.36) return "metaphase";
+    if (u < 0.58) return "anaphase";
+    if (u < 0.78) return "telophase";
+    return "cytokinesis";
+  },
+  ease(u) { const x = Math.max(0, Math.min(1, u)); return x * x * (3 - 2 * x); },
+  mix(a, b, u) { const e = this.ease(u); return a + (b - a) * e; },
+  spd() { return matchMedia("(prefers-reduced-motion: reduce)").matches ? 1.65 : 1; },
   fail(m) {
     this.mistakes++;
     audio.bad();
@@ -278,54 +317,107 @@ const Define = {
   },
   replicate() {
     if (this.state !== "idle") return;
-    const L = this.layout();
     this.replicated = true;
-    this.sis = { x: L.P.x + 58, y: L.P.y - 42 };
-    this.state = "drag";
+    this.state = "sphase";
+    this.sProg = 0.02;
     const r = $("#defRep"); if (r) r.disabled = true;
-    audio.ok();
-    NB.add("define", "Nuclear DNA replicated. Parent nucleus remains.");
-    toast("Sister chromatid set ready. Seat it in the empty cell.", "");
+    audio.copy();
+    NB.add("define", "S-phase started. Nuclear DNA is being copied inside the parent.");
+    toast("Watch the chromatids duplicate. The parent is not emptied.", "");
+  },
+  finishSphase() {
+    const L = this.layout();
+    this.sis = { x: L.P.x + 22, y: L.P.y - 8, vx: 2.4, vy: -1.6 };
+    this.state = "drag";
+    audio.pop();
+    toast("Sister nucleus peeled off. Seat it in the empty cell.", "");
   },
   runMito() {
-    if (this.state !== "copy") return;
+    if (this.state !== "insert" && this.state !== "copy") return;
     this.state = "mito";
+    this.mito = 0.001;
     const m = $("#defMito"); if (m) m.disabled = true;
     audio.ok();
-    NB.add("define", "Mitosis started. Nuclear DNA is being copied.");
+    NB.add("define", "Mitosis started. Identical chromatids moving to opposite poles.");
   },
   confirmClones() {
     if (this.state !== "env") return;
-    if (!this.tweaked) return this.fail("Move Clone B’s light or nutrients first — watch phenotype change.");
+    if (!this.tweaked) return this.fail("Change Clone B first — drag the lamp or pellet, or use the sliders.");
     this.state = "who";
     const s = $("#defStill"); if (s) s.disabled = true;
     const li = $("#defLight"); if (li) li.disabled = true;
     const f = $("#defFood"); if (f) f.disabled = true;
     audio.ok();
     NB.add("define", "Still clones: nuclear DNA matched after the environment changed.");
-    toast("Correct idea. Now click who matches the parent barcode.", "");
+    toast("Phenotype shifted. Nuclear barcode did not. Pick the match.", "");
   },
   tick() {
     const L = this.layout();
     if (!this.nuc) this.reset(false);
-    if (this.state === "idle") {
-      this.nuc.x = lerp(this.nuc.x, L.P.x - 6, 0.12);
-      this.nuc.y = lerp(this.nuc.y, L.P.y - 5, 0.12);
+    if (!this.cam) this.cam = { x: L.w / 2, y: L.h * 0.48, z: 1.08, f: 0.88 };
+    const now = performance.now();
+    const dt = Math.min(0.033, Math.max(0.008, (now - (this._now || now - 16)) / 1000));
+    this._now = now;
+    const k = dt * 60 * this.spd();
+    const aim = this.camAim(L);
+    this.cam.x = lerp(this.cam.x, aim.x, 0.045 * k);
+    this.cam.y = lerp(this.cam.y, aim.y, 0.045 * k);
+    this.cam.z = lerp(this.cam.z, aim.z * this.zoom, 0.05 * k);
+    this.cam.f = lerp(this.cam.f, aim.f, 0.06 * k);
+    this.dimple = lerp(this.dimple || 0, this.grab === "sis" && this.sis && dist(this.sis, L.C) < L.C.r + 16 ? 1 : 0, 0.12 * k);
+
+    if ((this.state === "idle" || this.state === "sphase") && this.grab !== "nuc") {
+      this.nuc.x = lerp(this.nuc.x, L.P.x - 6, 0.08 * k);
+      this.nuc.y = lerp(this.nuc.y, L.P.y - 5, 0.08 * k);
     }
-    if (this.sis && this.state !== "drag" && this.grab !== "sis") {
-      const tx = this.seated ? L.C.x - 6 : L.P.x + 28;
-      const ty = this.seated ? L.C.y - 5 : L.P.y - 18;
-      this.sis.x = lerp(this.sis.x, tx, 0.16);
-      this.sis.y = lerp(this.sis.y, ty, 0.16);
+    if (this.state === "sphase") {
+      this.sProg = Math.min(1, this.sProg + 0.0042 * k);
+      if (this.sProg >= 1) this.finishSphase();
     }
-    if (this.grab !== "sperm") { this.gamS.x = lerp(this.gamS.x, L.sperm.x, 0.12); this.gamS.y = lerp(this.gamS.y, L.sperm.y, 0.12); }
-    if (this.grab !== "egg") { this.gamE.x = lerp(this.gamE.x, L.egg.x, 0.12); this.gamE.y = lerp(this.gamE.y, L.egg.y, 0.12); }
+    if (this.grab === "sis" && this.sis && this.ptr) {
+      this.sis.x = lerp(this.sis.x, this.ptr.x, 0.28 * k);
+      this.sis.y = lerp(this.sis.y, this.ptr.y, 0.28 * k);
+      if (dist(this.sis, L.C) < L.C.r + 48) {
+        this.sis.x = lerp(this.sis.x, L.C.x, 0.06 * k);
+        this.sis.y = lerp(this.sis.y, L.C.y, 0.06 * k);
+      }
+    } else if (this.sis && this.state !== "drag") {
+      const tx = this.seated ? L.C.x - 4 : L.P.x + 28;
+      const ty = this.seated ? L.C.y - 4 : L.P.y - 18;
+      this.sis.x = lerp(this.sis.x, tx, 0.1 * k);
+      this.sis.y = lerp(this.sis.y, ty, 0.1 * k);
+    } else if (this.sis) coast(this.sis, 0.9);
+    if (this.grab === "lamp" && this.ptr) {
+      this.lamp.x = lerp(this.lamp.x, this.ptr.x, 0.32 * k);
+      this.lamp.y = lerp(this.lamp.y, this.ptr.y, 0.32 * k);
+    }
+    if (this.grab === "pellet" && this.ptr) {
+      this.pellet.x = lerp(this.pellet.x, this.ptr.x, 0.32 * k);
+      this.pellet.y = lerp(this.pellet.y, this.ptr.y, 0.32 * k);
+    }
+    if (this.state === "insert") {
+      this.insertU = Math.min(1, (this.insertU || 0) + 0.016 * k);
+      if (this.insertU >= 1) this.runMito();
+    }
+    if (this.grab !== "sperm") { this.gamS.x = lerp(this.gamS.x, L.sperm.x, 0.08 * k); this.gamS.y = lerp(this.gamS.y, L.sperm.y, 0.08 * k); }
+    if (this.grab !== "egg") { this.gamE.x = lerp(this.gamE.x, L.egg.x, 0.08 * k); this.gamE.y = lerp(this.gamE.y, L.egg.y, 0.08 * k); }
+    if (this.state === "env") {
+      if (this.grab !== "lamp") {
+        this.lamp.x = lerp(this.lamp.x, L.lamp.x, 0.06 * k);
+        this.lamp.y = lerp(this.lamp.y, L.lamp.y, 0.06 * k);
+      }
+      if (this.grab !== "pellet") {
+        this.pellet.x = lerp(this.pellet.x, L.pellet.x, 0.06 * k);
+        this.pellet.y = lerp(this.pellet.y, L.pellet.y, 0.06 * k);
+      }
+      this.morph = Math.min(1, (this.morph || 0) + 0.012 * k);
+    }
     if (this.state === "mito") {
-      const fast = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      this.mito = Math.min(1, this.mito + (fast ? 1 : 0.011));
+      this.mito = Math.min(1, this.mito + 0.0028 * k);
       if (this.mito >= 1) {
         this.state = "env";
-        this.grow = matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0.16;
+        this.morph = 0;
+        this.grow = 0.08;
         const li = $("#defLight"); if (li) li.disabled = false;
         const f = $("#defFood"); if (f) f.disabled = false;
         const s = $("#defStill"); if (s) s.disabled = false;
@@ -334,201 +426,446 @@ const Define = {
       }
     }
     if (this.state === "env" || this.state === "who" || this.state === "done") {
-      this.grow = Math.min(1, this.grow + 0.018);
+      this.grow = Math.min(1, this.grow + 0.01 * k);
     }
     this.draw();
-    if (this._hud !== this.state) {
-      this._hud = this.state;
+    const msg = this.steps()[this.state];
+    if (this._hud !== msg) {
+      this._hud = msg;
       const el = $("#defStep");
-      if (el) el.textContent = this.steps()[this.state];
+      if (el) el.textContent = msg;
     }
-    status(this.steps()[this.state], acc(this.mistakes));
+    status(msg, acc(this.mistakes));
+  },
+  camAim(L) {
+    const w = L.w, h = L.h;
+    if (this.state === "sphase") return { x: L.P.x, y: L.P.y, z: 1.18, f: 0.92 };
+    if (this.state === "drag" && this.sis) return { x: (this.sis.x + L.C.x) * 0.5, y: (this.sis.y + L.C.y) * 0.5, z: 1.08, f: 0.9 };
+    if (this.state === "insert") return { x: L.C.x, y: L.C.y, z: 1.16, f: 0.92 };
+    if (this.state === "mito") return { x: (L.P.x + L.C.x) * 0.5, y: L.P.y, z: 1.1, f: 0.9 };
+    if (this.state === "env") return { x: w * 0.5, y: h * 0.48, z: 1, f: 0.9 };
+    if (this.state === "who" || this.state === "done") return { x: w * 0.5, y: h * 0.5, z: 1, f: 0.9 };
+    return { x: (L.P.x + L.C.x) * 0.5, y: L.P.y, z: 1, f: 0.9 };
+  },
+  world(p) {
+    const cx = innerWidth / 2, cy = innerHeight * 0.48;
+    const cam = this.cam || { x: cx, y: cy, z: 1 };
+    const z = cam.z || 1;
+    return { x: cam.x + (p.x - cx) / z, y: cam.y + (p.y - cy) / z };
   },
   draw() {
     const L = this.layout(), w = L.w, h = L.h;
     const ctx = fit(sim, w, h);
     ctx.clearRect(0, 0, w, h);
-    drawDust(ctx, w, h, t, 40);
-    ctx.fillStyle = "rgba(16,22,20,0.45)";
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(w * 0.12, h * 0.16, w * 0.72, h * 0.70, 18);
-    else ctx.rect(w * 0.12, h * 0.16, w * 0.72, h * 0.70);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(212,180,138,0.22)"; ctx.lineWidth = 1.4; ctx.stroke();
-    ctx.fillStyle = "rgba(212,180,138,0.62)";
-    ctx.font = "11px IBM Plex Mono";
-    ctx.textAlign = "center";
-    ctx.fillText("GENOME COMPARISON  ·  4BI1  ·  NUCLEAR DNA", w * 0.48, h * 0.20);
-    ctx.textAlign = "start";
+    const cx = w / 2, cy = h * 0.48, rad = Math.min(w, h) * 0.42;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.clip();
+    const bg = ctx.createRadialGradient(cx, cy, 16, cx, cy, rad);
+    bg.addColorStop(0, `rgba(14,32,28,${0.35 + (1 - this.focus) * 0.2})`);
+    bg.addColorStop(1, `rgba(4,10,12,${0.72 + (1 - this.focus) * 0.2})`);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+    drawDust(ctx, w, h, t, 48);
+    const look = this.cam || { x: cx, y: cy, z: this.zoom, f: this.focus };
+    ctx.translate(cx, cy);
+    ctx.scale(look.z, look.z);
+    ctx.translate(-look.x, -look.y);
+    const blur = (1 - look.f) * 1.4;
+    if (blur > 0.35) ctx.filter = `blur(${blur}px)`;
 
-    this.drawBarcode(ctx, w * 0.48, h * 0.235, PARENT_SEQ, "parent nuclear barcode");
+    this.drawBarcode(ctx, look.x, look.y - rad / look.z + 36, PARENT_SEQ, "parent nuclear barcode");
 
-    if (this.state === "env") this.drawGrown(ctx, L);
-    else if (this.state === "who" || this.state === "done") this.drawWho(ctx, L);
+    const morph = this.morph || 0;
+    if (this.state === "who" || this.state === "done") this.drawWho(ctx, L);
+    else if (this.state === "env") {
+      if (morph < 1) {
+        ctx.save(); ctx.globalAlpha = 1 - morph; this.drawCells(ctx, L); ctx.restore();
+      }
+      ctx.save(); ctx.globalAlpha = morph; this.drawGrown(ctx, L); ctx.restore();
+    }
     else this.drawCells(ctx, L);
 
-    if (this.state === "idle" || this.state === "drag" || this.state === "copy") this.drawGametes(ctx, L);
+    if (this.state === "idle" || this.state === "sphase" || this.state === "drag" || this.state === "copy" || this.state === "insert") this.drawGametes(ctx, L);
+    ctx.filter = "none";
+    ctx.restore();
+
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(24,32,30,0.94)"; ctx.lineWidth = 36; ctx.stroke();
+    ctx.strokeStyle = `rgba(140,210,180,${0.16 + Math.sin(t) * 0.05})`; ctx.lineWidth = 10; ctx.stroke();
+    ctx.strokeStyle = "rgba(212,180,138,0.3)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, rad + 18, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "rgba(200,210,200,0.18)"; ctx.lineWidth = 1;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * (rad - 8), cy + Math.sin(a) * (rad - 8));
+      ctx.lineTo(cx + Math.cos(a) * (rad + 8), cy + Math.sin(a) * (rad + 8));
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(230,236,228,0.75)";
+    ctx.fillRect(cx + rad - 90, cy + 6, 44, 2);
+    ctx.font = "10px IBM Plex Mono";
+    ctx.textAlign = "center";
+    ctx.fillText("10 µm", cx + rad - 68, cy + 20);
+    const tag = this.state === "mito" ? this.mitoPhase().toUpperCase() : this.state.toUpperCase();
+    ctx.fillStyle = "rgba(212,180,138,0.72)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.fillText("DEFINITION BENCH  ·  OIL  100×  ·  " + tag, cx, cy + rad + 32);
+    ctx.textAlign = "start";
   },
   drawCells(ctx, L) {
     const seatHot = this.state === "drag" && this.sis && dist(this.sis, L.C) < L.C.r;
-    drawCell(ctx, { x: L.P.x, y: L.P.y, r: L.P.r, t, kind: "soma", showNuc: false, hot: this.state === "idle" });
-    drawCell(ctx, {
-      x: L.C.x, y: L.C.y, r: L.C.r, t, kind: "soma", showNuc: false,
-      hot: seatHot, pulse: this.seated ? 0.35 + Math.sin(t * 3) * 0.12 : 0
+    this.drawRichCell(ctx, {
+      x: L.P.x, y: L.P.y, r: L.P.r, hot: this.state === "idle",
+      empty: false, poisoned: false, sphase: this.state === "sphase" ? this.sProg : 0
     });
-    if (this.state === "mito") this.drawMito(ctx, L.P.x, L.P.y, L.P.r);
-    if (this.state === "mito" && this.seated) this.drawMito(ctx, L.C.x, L.C.y, L.C.r);
-    this.drawNuc(ctx, this.nuc.x, this.nuc.y, 17, this.grab === "nuc");
+    this.drawRichCell(ctx, {
+      x: L.C.x, y: L.C.y, r: L.C.r, hot: seatHot,
+      empty: !this.seated, poisoned: this.poisoned,
+      pulse: this.seated ? 0.2 + Math.sin(t * 2.2) * 0.06 : 0,
+      dimple: this.dimple || 0, insert: this.insertU || 0
+    });
+    if (this.state === "drag" && this.sis) snapRing(ctx, L.C.x, L.C.y, L.C.r + 10, seatHot);
+    if (this.state === "mito") {
+      this.drawMito(ctx, L.P.x, L.P.y, L.P.r);
+      if (this.seated) this.drawMito(ctx, L.C.x, L.C.y, L.C.r);
+    }
+    if (this.state !== "mito") this.drawNuc(ctx, this.nuc.x, this.nuc.y, 18, this.grab === "nuc" || this.state === "idle", this.state === "sphase" ? this.sProg : 0);
     if (this.sis && this.state !== "mito") {
-      this.drawNuc(ctx, this.sis.x, this.sis.y, 17, this.grab === "sis" || this.state === "drag");
+      const sink = this.state === "insert" ? this.ease(this.insertU || 0) : 0;
+      this.drawNuc(ctx, this.sis.x, this.sis.y, 17 * (1 - sink * 0.15), this.grab === "sis" || this.state === "drag", 1);
+      ctx.globalAlpha = 1 - sink * 0.35;
       ctx.fillStyle = "rgba(142,224,184,0.95)";
       ctx.font = "12px IBM Plex Sans";
       ctx.textAlign = "center";
-      ctx.fillText(this.seated ? "mitotic copy seated" : "sister nucleus  ·  drag into empty cell", this.sis.x, this.sis.y - 28);
+      ctx.fillText(this.seated ? "mitotic copy seated" : "sister nucleus  ·  drag into empty cytoplasm", this.sis.x, this.sis.y - 30);
+      ctx.textAlign = "start";
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = "rgba(232,239,230,0.82)";
+    ctx.font = "13px IBM Plex Sans";
+    ctx.textAlign = "center";
+    ctx.fillText("Parent  ·  diploid nucleus remains", L.P.x, L.P.y + L.P.r + 26);
+    ctx.fillText(
+      this.poisoned ? "Fertilised mix  ·  not a clone" : this.seated ? "Copy  ·  same nuclear DNA" : "Enucleated cytoplasm  ·  waiting",
+      L.C.x, L.C.y + L.C.r + 26
+    );
+    ctx.textAlign = "start";
+    if (this.state === "sphase") {
+      ctx.fillStyle = "rgba(142,224,184,0.85)";
+      ctx.font = "12px IBM Plex Mono";
+      ctx.textAlign = "center";
+      ctx.fillText("S-phase  " + Math.round(this.sProg * 100) + "%", L.P.x, L.P.y - L.P.r - 16);
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      ctx.fillRect(L.P.x - 50, L.P.y - L.P.r - 10, 100, 4);
+      ctx.fillStyle = "#8ee0b8";
+      ctx.fillRect(L.P.x - 50, L.P.y - L.P.r - 10, 100 * this.sProg, 4);
       ctx.textAlign = "start";
     }
-    ctx.fillStyle = "rgba(232,239,230,0.78)";
-    ctx.font = "14px IBM Plex Sans";
-    ctx.textAlign = "center";
-    ctx.fillText("Parent  ·  diploid nucleus stays", L.P.x, L.P.y + L.P.r + 28);
-    ctx.fillText(this.seated ? "Copy  ·  same nuclear DNA" : "Empty cell  ·  waiting for a mitotic copy", L.C.x, L.C.y + L.C.r + 28);
-    ctx.textAlign = "start";
-    if (this.replicated && this.state === "drag") {
-      ctx.strokeStyle = "rgba(142,224,184,0.35)";
-      ctx.setLineDash([5, 6]);
-      ctx.beginPath(); ctx.moveTo(this.sis.x, this.sis.y); ctx.lineTo(L.C.x, L.C.y); ctx.stroke();
-      ctx.setLineDash([]);
-    }
   },
-  drawMito(ctx, x, y, r) {
-    const u = this.mito;
+  drawRichCell(ctx, o) {
+    const { x, y, r, hot, empty, poisoned, sphase = 0, pulse = 0, dimple = 0, insert = 0 } = o;
     ctx.save();
     ctx.translate(x, y);
-    for (let i = 0; i < 6; i++) {
-      const ang = (i / 6) * Math.PI * 2;
-      const spread = u < 0.45 ? 22 : 22 + (u - 0.45) * 70;
-      const side = i % 2 === 0 ? 1 : -1;
-      const cx = Math.cos(ang) * (u < 0.45 ? 18 : spread * 0.35);
-      const cy = Math.sin(ang) * (u < 0.45 ? 14 : spread * 0.28) + (u > 0.45 ? side * (u - 0.45) * 40 : 0);
-      ctx.strokeStyle = "rgba(120,220,180,0.85)";
-      ctx.lineWidth = 2.2;
+    const wob = Math.sin(t * 0.55) * 0.018 + pulse * 0.03;
+    const rx = r * (1 + wob);
+    const ry = r * 0.88 * (1 + Math.cos(t * 0.42) * 0.018) * (1 - dimple * 0.06 - insert * 0.04);
+    ctx.beginPath();
+    ctx.ellipse(6, 10, rx * 1.02, ry * 0.95, 0.08, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.fill();
+    const g = ctx.createRadialGradient(-rx * 0.35, -ry * 0.4, 6, 0, 8, r * 1.1);
+    if (poisoned) {
+      g.addColorStop(0, "rgba(220,190,230,0.55)");
+      g.addColorStop(0.45, "rgba(90,50,90,0.5)");
+      g.addColorStop(1, "rgba(18,8,16,0.94)");
+    } else if (empty) {
+      g.addColorStop(0, "rgba(200,230,210,0.22)");
+      g.addColorStop(0.5, "rgba(30,70,55,0.35)");
+      g.addColorStop(1, "rgba(6,16,14,0.92)");
+    } else {
+      g.addColorStop(0, "rgba(220,255,236,0.55)");
+      g.addColorStop(0.35, "rgba(48,120,92,0.42)");
+      g.addColorStop(1, "rgba(6,20,16,0.94)");
+    }
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = hot ? "rgba(220,240,200,0.9)" : "rgba(150,230,190,0.4)";
+    ctx.lineWidth = hot ? 3 : 2;
+    ctx.stroke();
+    ctx.globalAlpha = 0.22;
+    ctx.lineWidth = 7;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (dimple > 0.05) {
+      ctx.strokeStyle = `rgba(142,224,184,${0.25 + dimple * 0.45})`;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(cx - 7, cy - 3);
-      ctx.quadraticCurveTo(cx, cy + (u < 0.35 ? 8 : 2), cx + 7, cy - 3);
+      ctx.ellipse(-8, -6, 16 + dimple * 10, 10 + dimple * 6, 0.2, 0, Math.PI * 2);
       ctx.stroke();
-      if (u > 0.22) {
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = t * 0.35 + i * 0.52;
+      const rad = rx * (0.28 + (i % 5) * 0.08);
+      ctx.fillStyle = "rgba(210,140,60,0.34)";
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * rad, Math.sin(a * 1.05) * ry * 0.42, 6.5, 3.2, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let i = 0; i < 20; i++) {
+      const a = t * 0.22 + i * 0.31;
+      ctx.fillStyle = "rgba(255,255,255,0.07)";
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * rx * 0.58, Math.sin(a) * ry * 0.52, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (empty && !poisoned) {
+      ctx.setLineDash([4, 5]);
+      ctx.strokeStyle = "rgba(180,220,200,0.28)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(-6, -4, r * 0.28, r * 0.24, 0.1, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (sphase > 0) {
+      ctx.strokeStyle = `rgba(142,224,184,${0.25 + sphase * 0.5})`;
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + t * 0.2;
+        const fork = this.ease(sphase);
         ctx.beginPath();
-        ctx.moveTo(cx - 7, cy + 3);
-        ctx.quadraticCurveTo(cx, cy - (u < 0.35 ? 8 : 2), cx + 7, cy + 3);
+        ctx.ellipse(Math.cos(a) * 10, Math.sin(a) * 8, 5 + fork * 4, 2.2, a, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(a) * 10 + 7 * fork, Math.sin(a) * 8, 4, 2, a, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
-    if (u > 0.72) {
-      ctx.strokeStyle = `rgba(200,230,210,${(u - 0.72) * 3})`;
+    ctx.restore();
+  },
+  drawMito(ctx, x, y, r) {
+    const u = this.state === "insert" ? 0 : this.mito;
+    ctx.save();
+    ctx.translate(x, y);
+    const envA = u < 0.16 ? 1 - this.ease(u / 0.16) : u > 0.7 ? this.ease((u - 0.7) / 0.18) : 0;
+    if (envA > 0.04) {
+      ctx.globalAlpha = envA;
+      ctx.strokeStyle = "rgba(180,230,200,0.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 0, 22, 18, 0.12, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    const n = 6;
+    const poleY = this.mix(8, r * 0.52, Math.min(1, u / 0.32));
+    if (u > 0.12 && u < 0.72) {
+      ctx.strokeStyle = `rgba(200,220,255,${0.12 + (0.5 - Math.abs(u - 0.4))})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < n; i++) {
+        const p = this.chrPair(i, n, u);
+        ctx.beginPath(); ctx.moveTo(0, -poleY); ctx.lineTo(p.x, p.y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, poleY); ctx.lineTo(p.x, p.y2); ctx.stroke();
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const p = this.chrPair(i, n, u);
+      this.drawChromatid(ctx, p.x, p.y1, 0.95, false);
+      this.drawChromatid(ctx, p.x, p.y2, 0.95, true);
+    }
+    if (u > 0.2 && u < 0.5) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.12 + (0.36 - Math.abs(u - 0.3)) * 0.8})`;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(-r * 0.62, 0); ctx.lineTo(r * 0.62, 0); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (u > 0.76) {
+      const gap = this.ease((u - 0.76) / 0.24);
+      ctx.strokeStyle = `rgba(200,230,210,${0.35 + gap * 0.5})`;
+      ctx.lineWidth = 1.5 + gap * 5;
       ctx.beginPath(); ctx.moveTo(-r * 0.9, 0); ctx.lineTo(r * 0.9, 0); ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * (1 - gap * 0.12), r * 0.88 * (1 - gap * 0.52), 0, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(142,224,184,0.4)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
     ctx.restore();
-    drawHelix(ctx, x - 70, y + r + 46, 140, t + u * 4, true);
+  },
+  chrPair(i, n, u) {
+    const base = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const plateX = (i - (n - 1) / 2) * 13;
+    const proX = Math.cos(base) * 14, proY = Math.sin(base) * 11;
+    const split = this.ease(Math.max(0, (u - 0.36) / 0.28));
+    const toPole = this.ease(Math.max(0, (u - 0.55) / 0.22));
+    const x = this.mix(this.mix(proX, plateX, Math.min(1, u / 0.34)), plateX * (1 - toPole * 0.3), split);
+    const y0 = this.mix(proY, Math.sin(t * 1.4 + i) * 1.5, Math.min(1, u / 0.34));
+    const pole = 26 + toPole * 16;
+    return { x, y1: y0 - split * pole, y2: y0 + 5 * (1 - split) + split * pole };
+  },
+  drawChromatid(ctx, x, y, s, twin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.strokeStyle = twin ? "rgba(232,188,96,0.95)" : "rgba(126,230,184,0.95)";
+    ctx.shadowColor = twin ? "rgba(232,188,96,0.35)" : "rgba(126,230,184,0.3)";
+    ctx.shadowBlur = 6;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-7, -8);
+    ctx.quadraticCurveTo(-1, -1, -7, 8);
+    ctx.moveTo(7, -8);
+    ctx.quadraticCurveTo(1, -1, 7, 8);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   },
   drawGrown(ctx, L) {
-    const aScale = 1.08 * this.grow;
-    const bScale = (0.62 + this.food / 180) * this.grow;
-    const aHue = 0.55;
-    const bHue = 0.18 + this.light / 180;
-    this.drawCritter(ctx, L.P.x, L.P.y + 10, aScale, aHue, "Clone A  ·  matched conditions", PARENT_SEQ, true);
-    this.drawCritter(ctx, L.C.x, L.C.y + 10, bScale, bHue, "Clone B  ·  your environment", PARENT_SEQ, true);
-    ctx.fillStyle = "rgba(224,180,120,0.85)";
+    const aScale = (1.05 + this.grow * 0.08);
+    const bScale = (0.58 + this.food / 160) * (0.7 + this.grow * 0.3);
+    const aHue = 0.58;
+    const bHue = 0.12 + this.light / 150;
+    this.drawCritter(ctx, L.P.x, L.P.y + 4, aScale, aHue, "Clone A  ·  matched conditions", PARENT_SEQ, true);
+    this.drawCritter(ctx, L.C.x, L.C.y + 4, bScale, bHue, "Clone B  ·  your environment", PARENT_SEQ, true);
+    this.drawLamp(ctx, this.lamp.x, this.lamp.y, this.grab === "lamp");
+    this.drawPellet(ctx, this.pellet.x, this.pellet.y, this.grab === "pellet");
+    snapRing(ctx, L.C.x, L.C.y, 100, (this.grab === "lamp" && dist(this.lamp, L.C) < 110) || (this.grab === "pellet" && dist(this.pellet, L.C) < 110));
+    ctx.fillStyle = "rgba(224,180,120,0.88)";
     ctx.font = "13px IBM Plex Sans";
     ctx.textAlign = "center";
-    ctx.fillText(this.tweaked ? "Phenotypes differ. Barcodes still match." : "Pull Clone B’s sliders — watch size and pigment, not the barcode.", L.w * 0.48, L.h * 0.78);
+    ctx.fillText(this.tweaked ? "Phenotypes differ. Barcodes still match." : "Drag the lamp or food pellet onto Clone B.", L.w * 0.5, L.h * 0.22);
     ctx.textAlign = "start";
+  },
+  drawLamp(ctx, x, y, hot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = hot ? "rgba(255,220,140,0.28)" : "rgba(255,200,80,0.12)";
+    ctx.beginPath(); ctx.arc(0, 8, 28, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#e0c49a";
+    ctx.fillRect(-4, -22, 8, 18);
+    ctx.beginPath(); ctx.moveTo(-16, -4); ctx.lineTo(16, -4); ctx.lineTo(10, 10); ctx.lineTo(-10, 10); ctx.closePath();
+    ctx.fillStyle = hot ? "#ffe08a" : "#d4b48a";
+    ctx.fill();
+    ctx.fillStyle = "rgba(232,239,230,0.75)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.textAlign = "center";
+    ctx.fillText("lamp  ·  light", 0, 28);
+    ctx.textAlign = "start";
+    ctx.restore();
+  },
+  drawPellet(ctx, x, y, hot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = hot ? "rgba(120,80,40,0.95)" : "rgba(90,60,32,0.9)";
+    ctx.beginPath(); ctx.ellipse(0, 0, 16, 11, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,220,170,0.35)"; ctx.stroke();
+    ctx.fillStyle = "rgba(232,239,230,0.75)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.textAlign = "center";
+    ctx.fillText("pellet  ·  nutrients", 0, 26);
+    ctx.textAlign = "start";
+    ctx.restore();
   },
   drawWho(ctx, L) {
     const items = [
-      { seq: PARENT_SEQ, label: "same nuclear DNA", clone: true },
-      { seq: SEX_SEQ, label: "two gametes mixed", clone: false },
-      { seq: UNREL_SEQ, label: "unrelated genome", clone: false }
+      { seq: PARENT_SEQ, label: "same nuclear DNA", clone: true, hue: 0.55 },
+      { seq: SEX_SEQ, label: "two gametes mixed", clone: false, hue: 0.5 },
+      { seq: UNREL_SEQ, label: "unrelated genome", clone: false, hue: 0.12 }
     ];
-    const xs = [L.w * 0.22, L.w * 0.42, L.w * 0.62];
+    const xs = [L.w * 0.28, L.w * 0.50, L.w * 0.72];
     const y = L.h * 0.50;
     this.whoHits = [];
     this.order.forEach((idx, i) => {
       const it = items[idx];
       const x = xs[i];
       this.whoHits.push({ x, y, r: 88, clone: it.clone, i });
-      ctx.fillStyle = this.state === "done" && it.clone ? "rgba(110,196,160,0.16)" : "rgba(8,12,10,0.55)";
+      ctx.fillStyle = this.state === "done" && it.clone ? "rgba(110,196,160,0.16)" : "rgba(8,12,10,0.5)";
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x - 86, y - 118, 172, 230, 14); else ctx.rect(x - 86, y - 118, 172, 230);
+      if (ctx.roundRect) ctx.roundRect(x - 90, y - 124, 180, 248, 16); else ctx.rect(x - 90, y - 124, 180, 248);
       ctx.fill();
-      ctx.strokeStyle = it.clone && this.state === "done" ? "rgba(142,224,184,0.85)" : "rgba(212,180,138,0.28)";
+      ctx.strokeStyle = it.clone && this.state === "done" ? "rgba(142,224,184,0.85)" : "rgba(212,180,138,0.25)";
       ctx.stroke();
-      this.drawCritter(ctx, x, y - 24, 0.7, it.clone ? 0.55 : (idx === 1 ? 0.52 : 0.12), "", it.seq, true);
+      this.drawCritter(ctx, x, y - 28, 0.78, it.clone ? 0.55 : it.hue, "", it.seq, true);
       ctx.fillStyle = "rgba(232,239,230,0.8)";
       ctx.font = "12px IBM Plex Sans";
       ctx.textAlign = "center";
-      ctx.fillText(this.state === "done" ? it.label : "Organism " + String.fromCharCode(80 + i), x, y + 96);
+      ctx.fillText(this.state === "done" ? it.label : "Organism " + String.fromCharCode(80 + i), x, y + 104);
     });
-    ctx.fillStyle = "rgba(224,180,120,0.85)";
+    ctx.fillStyle = "rgba(224,180,120,0.88)";
     ctx.font = "13px IBM Plex Sans";
     ctx.textAlign = "center";
-    ctx.fillText(this.state === "done" ? "The clone is the match — appearance was a decoy." : "Click whose nuclear barcode matches the parent.", L.w * 0.42, L.h * 0.78);
+    ctx.fillText(this.state === "done" ? "The clone is the match — appearance was a decoy." : "Read the barcode. Click who matches the parent.", L.w * 0.5, L.h * 0.22);
     ctx.textAlign = "start";
   },
   drawCritter(ctx, x, y, s, hue, label, seq, showBar) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(s, s);
-    const g = ctx.createRadialGradient(-20, -30, 8, 0, 10, 70);
-    g.addColorStop(0, `rgba(${140 + hue * 110},${190 + hue * 30},${110},0.95)`);
-    g.addColorStop(0.55, `rgba(${70 + hue * 90},${130 + hue * 20},${70},0.92)`);
-    g.addColorStop(1, `rgba(18,40,22,0.96)`);
+    const g = ctx.createRadialGradient(-18, -26, 8, 0, 12, 74);
+    g.addColorStop(0, `rgba(${150 + hue * 100},${186 + hue * 40},${100},0.95)`);
+    g.addColorStop(0.55, `rgba(${60 + hue * 100},${120 + hue * 30},${64},0.92)`);
+    g.addColorStop(1, `rgba(16,36,20,0.96)`);
     ctx.beginPath();
-    ctx.ellipse(0, 8, 48, 38, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 10, 50, 40, 0, 0, Math.PI * 2);
     ctx.fillStyle = g;
     ctx.fill();
-    ctx.strokeStyle = "rgba(230,250,220,0.7)";
-    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = "rgba(230,250,220,0.65)";
+    ctx.lineWidth = 2.2;
     ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(-18, -28, 10, 16, -0.3, 0, Math.PI * 2);
-    ctx.beginPath(); ctx.ellipse(18, -28, 10, 16, 0.3, 0, Math.PI * 2);
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = `rgba(40,70,40,${0.12 + hue * 0.2})`;
+      ctx.beginPath();
+      ctx.ellipse(-16 + i * 8, 6 + (i % 2) * 6, 5, 3, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = `rgba(${70 + hue * 100},${130},${80},0.9)`;
-    ctx.beginPath(); ctx.ellipse(-18, -28, 10, 16, -0.25, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(18, -28, 10, 16, 0.25, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(20,28,22,0.9)";
-    ctx.beginPath(); ctx.arc(-12, 0, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(12, 0, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-18, -30, 11, 17, -0.28, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(18, -30, 11, 17, 0.28, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(18,26,20,0.92)";
+    ctx.beginPath(); ctx.arc(-12, 0, 4.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(12, 0, 4.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.arc(-10.5, -1, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(13.5, -1, 1.3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    if (showBar) this.drawBarcode(ctx, x, y + 58 * s, seq, label);
+    if (showBar) this.drawBarcode(ctx, x, y + 62 * s, seq, label);
   },
   drawGametes(ctx, L) {
     ctx.fillStyle = "rgba(180,160,230,0.55)";
     ctx.font = "11px IBM Plex Mono";
     ctx.textAlign = "center";
-    ctx.fillText("DECOYS  ·  SEXUAL REPRODUCTION", (L.sperm.x + L.egg.x) / 2, L.sperm.y - 36);
-    ctx.beginPath(); ctx.ellipse(this.gamS.x, this.gamS.y, 10, 7, t, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(160,140,230,0.9)"; ctx.fill();
+    ctx.fillText("DECOYS  ·  SEXUAL REPRODUCTION", (L.sperm.x + L.egg.x) / 2, L.sperm.y - 38);
+    ctx.beginPath(); ctx.ellipse(this.gamS.x, this.gamS.y, 11, 7.5, t * 2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(160,140,230,0.92)"; ctx.fill();
     ctx.beginPath(); ctx.moveTo(this.gamS.x + 10, this.gamS.y);
-    ctx.quadraticCurveTo(this.gamS.x + 28, this.gamS.y + Math.sin(t * 8) * 6, this.gamS.x + 40, this.gamS.y);
-    ctx.strokeStyle = "rgba(180,170,230,0.8)"; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.quadraticCurveTo(this.gamS.x + 30, this.gamS.y + Math.sin(t * 9) * 7, this.gamS.x + 44, this.gamS.y);
+    ctx.strokeStyle = "rgba(180,170,230,0.85)"; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.fillStyle = "rgba(200,190,230,0.8)";
     ctx.fillText("sperm  ·  haploid", this.gamS.x, this.gamS.y + 28);
-    drawCell(ctx, { x: this.gamE.x, y: this.gamE.y, r: 20, t, kind: "egg", showNuc: true, hot: this.grab === "egg" });
-    ctx.fillStyle = "rgba(224,180,140,0.8)";
-    ctx.fillText("egg  ·  haploid nucleus", this.gamE.x, this.gamE.y + 36);
+    drawCell(ctx, { x: this.gamE.x, y: this.gamE.y, r: 22, t, kind: "egg", showNuc: true, hot: this.grab === "egg" });
+    ctx.fillStyle = "rgba(224,180,140,0.82)";
+    ctx.fillText("egg  ·  haploid nucleus", this.gamE.x, this.gamE.y + 38);
     ctx.textAlign = "start";
   },
-  drawNuc(ctx, x, y, r, hot) {
+  drawNuc(ctx, x, y, r, hot, copy = 0) {
     const g = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, r);
-    g.addColorStop(0, "rgba(120,220,180,0.95)");
-    g.addColorStop(1, "rgba(20,80,60,0.92)");
-    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.86, 0.15, 0, Math.PI * 2);
+    g.addColorStop(0, "rgba(140,230,190,0.96)");
+    g.addColorStop(1, "rgba(18,78,58,0.94)");
+    ctx.beginPath(); ctx.ellipse(x, y, r * (1 + copy * 0.08), r * 0.86, 0.15, 0, Math.PI * 2);
     ctx.fillStyle = g; ctx.fill();
     ctx.strokeStyle = hot ? "rgba(142,224,184,0.95)" : "rgba(255,255,255,0.32)";
     ctx.lineWidth = hot ? 2.4 : 1.1; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + 4, y - 2, 4.2, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(20,60,48,0.55)"; ctx.fill();
     if (hot) {
       ctx.beginPath(); ctx.arc(x, y, r + 8 + Math.sin(t * 6) * 2, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(142,224,184,0.7)"; ctx.lineWidth = 2; ctx.stroke();
     }
-    ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 1;
     for (let i = 0; i < 5; i++) {
       ctx.beginPath();
       ctx.moveTo(x - 8 + i * 4, y - 7);
@@ -537,23 +874,27 @@ const Define = {
     }
   },
   drawBarcode(ctx, x, y, seq, label) {
-    const w = seq.length * 11;
-    let px = x - w / 2;
+    const bw = seq.length * 11;
+    let px = x - bw / 2;
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(px - 6, y - 4, bw + 12, 22);
     for (let i = 0; i < seq.length; i++) {
       ctx.fillStyle = BASES[seq[i]];
       ctx.fillRect(px, y, 9, 14);
       px += 11;
     }
     if (label) {
-      ctx.fillStyle = "rgba(200,210,200,0.7)";
+      ctx.fillStyle = "rgba(200,210,200,0.75)";
       ctx.font = "11px IBM Plex Mono";
       ctx.textAlign = "center";
-      ctx.fillText(label, x, y + 28);
+      ctx.fillText(label, x, y + 30);
       ctx.textAlign = "start";
     }
   },
   down(p) {
     if (inspect) return this.inspectAt(p);
+    p = this.world(p);
+    this.ptr = { x: p.x, y: p.y };
     if (this.state === "who") {
       const hit = (this.whoHits || []).find((h) => dist(p, h) < h.r);
       if (!hit) return;
@@ -566,55 +907,98 @@ const Define = {
       } else this.fail("Look at the barcode. The clone matches the parent nuclear DNA — not a sexual mix.");
       return;
     }
-    if (this.state === "idle" && dist(p, this.nuc) < 22) { this.replicate(); return; }
-    if (this.state === "drag" && this.sis && dist(p, this.sis) < 24) { this.grab = "sis"; return; }
-    if (this.state === "idle" || this.state === "drag") {
-      if (dist(p, this.gamS) < 24) { this.grab = "sperm"; return; }
-      if (dist(p, this.gamE) < 30) { this.grab = "egg"; return; }
+    if (this.state === "env") {
+      if (this.lamp && dist(p, this.lamp) < 36) { this.grab = "lamp"; return; }
+      if (this.pellet && dist(p, this.pellet) < 32) { this.grab = "pellet"; return; }
+      const L = this.layout();
+      if (dist(p, L.C) < 90 || dist(p, L.P) < 90) {
+        if (this.tweaked) this.confirmClones();
+        else this.fail("Change Clone B’s light or food first, then click a clone.");
+      }
+      return;
     }
-    if (this.state === "idle" && dist(p, this.layout().P) < 90) this.replicate();
+    if (this.state === "idle" && (dist(p, this.nuc) < 28 || dist(p, this.layout().P) < 96)) { this.replicate(); return; }
+    if ((this.state === "sphase" || this.state === "drag") && dist(p, this.nuc) < 26) { this.grab = "nuc"; return; }
+    if (this.state === "drag" && this.sis && dist(p, this.sis) < 36) { this.grab = "sis"; audio.grab(); return; }
+    if (this.state === "idle" || this.state === "sphase" || this.state === "drag") {
+      if (dist(p, this.gamS) < 28) { this.grab = "sperm"; return; }
+      if (dist(p, this.gamE) < 36) { this.grab = "egg"; return; }
+    }
   },
   move(p) {
-    if (this.grab === "sis" && this.sis) { this.sis.x = p.x; this.sis.y = p.y; }
-    if (this.grab === "sperm") { this.gamS.x = p.x; this.gamS.y = p.y; }
-    if (this.grab === "egg") { this.gamE.x = p.x; this.gamE.y = p.y; }
-    if (this.state === "idle" && this.grab === "nuc") { this.nuc.x = p.x; this.nuc.y = p.y; }
+    p = this.world(p);
+    this.ptr = { x: p.x, y: p.y };
+    if (this.grab === "sperm") { this.gamS.x = lerp(this.gamS.x, p.x, 0.45); this.gamS.y = lerp(this.gamS.y, p.y, 0.45); }
+    else if (this.grab === "egg") { this.gamE.x = lerp(this.gamE.x, p.x, 0.45); this.gamE.y = lerp(this.gamE.y, p.y, 0.45); }
+    else if (this.grab === "nuc") { this.nuc.x = lerp(this.nuc.x, p.x, 0.4); this.nuc.y = lerp(this.nuc.y, p.y, 0.4); }
   },
   up(p) {
+    p = this.world(p);
     const L = this.layout();
     const g = this.grab;
     this.grab = null;
-    if (!g) return;
+    this.draggingSample = false;
+    if (!g) { this.ptr = null; return; }
     if (g === "sis") {
-      if (dist(this.sis, L.C) < L.C.r - 8) {
+      if (dist(this.sis, L.C) < L.C.r + 18) {
+        if (this.poisoned) { this.ptr = null; return this.fail("This cytoplasm already mixed two genomes. Reset — you cannot clone from a fertilised mix."); }
         this.seated = true;
-        this.sis.x = L.C.x - 6; this.sis.y = L.C.y - 5;
-        this.state = "copy";
+        this.insertU = 0.02;
+        this.state = "insert";
         const m = $("#defMito"); if (m) m.disabled = false;
-        audio.ok();
+        audio.place();
         NB.add("define", "Sister nucleus seated. Parent still has its own genome.");
         toast("Ready for mitosis. The parent was not emptied.", "");
       } else if (dist(this.sis, L.P) < L.P.r) {
         this.fail("The parent already has its nucleus. Seat the copy in the empty cell.");
       }
+      this.ptr = null;
       return;
     }
     if (g === "sperm" || g === "egg") {
       if (dist(p, L.C) < L.C.r || dist(p, L.P) < L.P.r) {
-        this.fail("Gametes mix two genomes. That is sexual reproduction — the offspring is not a clone.");
+        this.poisoned = true;
+        this.fail("Gametes mixed two genomes. That cell is no longer a clone of the parent. Reset the bench.");
       }
+      this.ptr = null;
+      return;
     }
     if (g === "nuc") {
       this.fail("Cloning copies nuclear DNA by mitosis. It does not steal the parent’s only nucleus.");
+      this.ptr = null;
+      return;
     }
+    if (g === "lamp" && dist(this.lamp, L.C) < 110) {
+      this.light = Math.min(100, this.light + 18);
+      this.tweaked = true;
+      const el = $("#defLight"); if (el) el.value = this.light;
+      audio.place();
+      toast("Clone B illuminated. Pigment can change. The barcode does not.", "");
+    }
+    if (g === "pellet" && dist(this.pellet, L.C) < 110) {
+      this.food = Math.min(100, this.food + 16);
+      this.tweaked = true;
+      const el = $("#defFood"); if (el) el.value = this.food;
+      audio.place();
+      toast("Clone B fed. Size can change. Nuclear DNA does not.", "");
+    }
+    this.ptr = null;
+  },
+  wheel(delta) {
+    this.zoom = Math.min(1.8, Math.max(0.75, this.zoom + (delta > 0 ? -0.07 : 0.07)));
+    const z = $("#defZoom"); if (z) z.value = this.zoom;
   },
   inspectAt(p) {
+    const sx = p.x, sy = p.y;
+    p = this.world(p);
     const L = this.layout();
-    if (dist(p, L.P) < L.P.r) callout("Parent cell", "Diploid nucleus stays here. Cloning copies it by mitosis; the parent is not emptied.", p.x, p.y);
-    else if (dist(p, L.C) < L.C.r) callout("Recipient cell", "Receives a mitotic copy of nuclear DNA. Same genes as the parent.", p.x, p.y);
-    else if (dist(p, this.gamS) < 28) callout("Sperm", "Haploid gamete. Fusion with an egg shuffles alleles — not a clone.", p.x, p.y);
-    else if (dist(p, this.gamE) < 32) callout("Egg", "Haploid nucleus. Needed for fertilisation, not for making a clone of this parent.", p.x, p.y);
-    else if ((this.whoHits || []).some((h) => dist(p, h) < h.r)) callout("Nuclear barcode", "Read the sequence. The clone matches the parent. Appearance can lie.", p.x, p.y);
+    if (dist(p, L.P) < L.P.r) callout("Parent cell", "Diploid nucleus stays here. S-phase copies chromatids; mitosis shares them. The parent is not emptied.", sx, sy);
+    else if (dist(p, L.C) < L.C.r) callout(this.poisoned ? "Fertilised mix" : "Recipient cytoplasm", this.poisoned ? "Two haploid genomes mixed. This is sexual reproduction, not a clone." : "Enucleated cytoplasm waiting for a mitotic copy of the parent nucleus.", sx, sy);
+    else if (dist(p, this.gamS) < 28) callout("Sperm", "Haploid gamete. Fusion shuffles alleles — not a clone.", sx, sy);
+    else if (dist(p, this.gamE) < 32) callout("Egg", "Haploid nucleus. Needed for fertilisation, not for cloning this parent.", sx, sy);
+    else if (this.state === "env" && dist(p, this.lamp) < 30) callout("Lamp", "Environment. Light can change phenotype, not nuclear DNA.", sx, sy);
+    else if (this.state === "env" && dist(p, this.pellet) < 28) callout("Nutrients", "Food changes size and condition. The barcode stays the parent’s.", sx, sy);
+    else if ((this.whoHits || []).some((h) => dist(p, h) < h.r)) callout("Nuclear barcode", "Read the sequence. The clone matches the parent. Appearance can lie.", sx, sy);
     else hideCallout();
   }
 };
@@ -629,6 +1013,10 @@ function bindDefDock() {
   };
   $("#defLight").oninput = sync;
   $("#defFood").oninput = sync;
+  const z = $("#defZoom");
+  if (z) z.oninput = (e) => { e.stopPropagation(); Define.zoom = Number(e.target.value); };
+  const f = $("#defFocus");
+  if (f) f.oninput = (e) => { e.stopPropagation(); Define.focus = Number(e.target.value); };
 }
 
 /* ---------- SCNT ---------- */
@@ -740,9 +1128,13 @@ const SCNT = {
       ctx.lineTo(cx + Math.cos(a) * (rad + 8), cy + Math.sin(a) * (rad + 8));
       ctx.stroke();
     }
+    ctx.fillStyle = "rgba(230,236,228,0.75)";
+    ctx.fillRect(cx + rad - 86, cy + 8, 42, 2);
+    ctx.font = "10px IBM Plex Mono";
+    ctx.textAlign = "center";
+    ctx.fillText("10 µm", cx + rad - 65, cy + 22);
     ctx.fillStyle = "rgba(212,180,138,0.7)";
     ctx.font = "11px IBM Plex Mono";
-    ctx.textAlign = "center";
     ctx.fillText("OPTICAL FIELD  ·  OIL  100×  ·  " + this.state.toUpperCase(), cx, cy + rad + 32);
     ctx.textAlign = "start";
   },
@@ -833,22 +1225,33 @@ const SCNT = {
     ctx.fillStyle = "#d4b48a"; ctx.font = "17px IBM Plex Sans"; ctx.textAlign = "center";
     ctx.fillText(names[stage] + "  —  mitosis copies donor nuclear DNA", cx, cy - 118);
     ctx.font = "12px IBM Plex Mono";
-    ctx.fillText(this.state === "compare" ? "Clone nuclear DNA = somatic donor  ·  not the surrogate" : "Wait for blastocyst before implant", cx, cy - 96);
+    ctx.fillText(this.state === "compare" ? "Clone nuclear DNA = somatic donor  ·  not the surrogate" : "Wait for blastocyst, then click the embryo to implant", cx, cy - 96);
     ctx.textAlign = "start";
     const zona = 42 + Math.min(82, n * 3.4);
+    ctx.beginPath(); ctx.arc(cx, cy, zona + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,210,160,0.16)"; ctx.lineWidth = 16; ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, zona, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,220,170,0.28)"; ctx.lineWidth = 10; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,220,170,0.42)"; ctx.lineWidth = 4; ctx.stroke();
     if (stage >= 5) {
-      ctx.beginPath(); ctx.arc(cx + 18, cy - 8, zona * 0.38, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + 16, cy - 10, zona * 0.36, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(20,40,36,0.45)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "rgba(212,180,138,0.8)"; ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText("blastocoel", cx + 16, cy - 10);
+      ctx.fillText("inner cell mass", cx - zona * 0.35, cy + 8);
+      ctx.fillText("trophectoderm", cx, cy + zona - 18);
+      ctx.textAlign = "start";
     }
+    const furrow = this.div - Math.floor(this.div);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + t * 0.05;
       const rad = n === 1 ? 0 : 26 + Math.min(72, n * 3);
+      const r = n === 1 ? 62 : Math.max(10, 32 - n * 0.65);
+      const pulse = n === 2 && furrow > 0.55 ? 1 + Math.sin(t * 8) * 0.04 : 1;
       drawCell(ctx, {
         x: cx + Math.cos(a) * rad, y: cy + Math.sin(a) * rad,
-        r: n === 1 ? 62 : Math.max(10, 32 - n * 0.65),
-        t, kind: "soma", showNuc: true, hot: this.state === "compare"
+        r: r * pulse,
+        t, kind: "soma", showNuc: true, hot: this.state === "compare" || (stage >= 5 && this.div >= 4.2)
       });
     }
     const frac = Math.min(1, this.div / 5.2);
@@ -859,8 +1262,13 @@ const SCNT = {
   },
   down(p) {
     if (inspect) return this.inspectAt(p);
+    if ((this.state === "dividing" || this.state === "compare") && this.div >= 4.2 && !this.implanted) {
+      this.implant();
+      return;
+    }
     if (dist(p, this.pip) < 40 || dist(p, this.tip()) < 32) {
       this.grab = true;
+      audio.grab();
       return;
     }
     if (this.state === "idle" && dist(p, this.nucAt("d")) < 36) { this.snapTo(this.nucAt("d")); return; }
@@ -905,18 +1313,18 @@ const SCNT = {
   },
   extractD() {
     this.nucD.out = true; this.nucD.anim = 1; this.pip.load = "d"; this.state = "egg";
-    audio.ok(); NB.add("scnt", "Somatic nucleus aspirated. Membrane deformed.");
+    audio.wet(); NB.add("scnt", "Somatic nucleus aspirated. Membrane deformed.");
     toast("Diploid nucleus collected. Now remove the egg’s nucleus.", "");
   },
   extractE() {
     this.nucE.out = true; this.nucE.anim = 1; this.egg.enuc = true; this.state = "transfer";
-    audio.ok(); NB.add("scnt", "Egg enucleated. Cytoplasm retained.");
+    audio.wet(); NB.add("scnt", "Egg enucleated. Cytoplasm retained.");
     toast("Egg enucleated. Seat the donor nucleus next.", "");
   },
   insert() {
     if (!this.egg.enuc) return this.fail("The egg has not been enucleated. Remove its nucleus first.");
     this.settle = 0.02; this.state = "seating";
-    audio.ok(); NB.add("scnt", "Pipette entered cytoplasm. Nucleus transferring.");
+    audio.place(); NB.add("scnt", "Pipette entered cytoplasm. Nucleus transferring.");
   },
   activate() {
     if (this.state !== "activate") {
@@ -925,12 +1333,13 @@ const SCNT = {
       return;
     }
     this.pulse = 1; this.state = "dividing"; this.play = 1; this.div = 0;
-    audio.ok(); NB.add("scnt", "Pulse applied. Mitosis begins — DNA was not added.");
+    audio.pulse(); NB.add("scnt", "Pulse applied. Mitosis begins — DNA was not added.");
     toast("Mitosis started. Use Play / Fast, then implant at blastocyst.", "");
   },
   implant() {
     if (this.div < 4.2) return this.fail("Wait until morula / blastocyst.");
     this.implanted = true; this.state = "compare"; markDone("scnt"); markSim("scnt");
+    audio.chime();
     NB.add("scnt", "Embryo in surrogate. Nuclear DNA = somatic donor.");
     toast("Clone produced. Nuclear DNA matches the body-cell donor.", "");
   },
@@ -1355,6 +1764,12 @@ const Dolly = {
     if (this.state === "implant" && this.embryo && !this.embryo.gone) {
       this.cleave = Math.min(3.2, this.cleave + (reduce ? 0.05 : 0.01));
     }
+    if (!this.drag) {
+      ["soma", "egg", "nucE", "recon", "embryo"].forEach((id) => {
+        const o = this[id];
+        if (o && !o.gone) coast(o);
+      });
+    }
     const w = innerWidth, h = innerHeight, ctx = fit(sim, w, h), L = this.layout();
     const ph = this.phase();
     ctx.clearRect(0, 0, w, h);
@@ -1384,6 +1799,9 @@ const Dolly = {
     if (ph === "bench") {
       this.drawBench(ctx, L, ph);
       this.drawBits(ctx);
+      if (this.drag?.id === "nucE") snapRing(ctx, L.x.x, L.x.y, 36, this.nucE && dist(this.nucE, L.x) < 40);
+      if (this.drag?.id === "soma" && this.egg) snapRing(ctx, this.egg.x, this.egg.y, 44, dist(this.soma, this.egg) < 36);
+      if (this.drag?.id === "recon") snapRing(ctx, L.tube.x, L.tube.y, 48, dist(this.recon, L.tube) < 46);
       this.drawScope(ctx, L, w, h);
     } else if (ph === "womb") {
       this.drawBench(ctx, L, ph);
@@ -1578,7 +1996,13 @@ const Dolly = {
       if (o && !o.gone && dist(p, o) < (o.r || 16) + 14) { this.drag = { id, ox: p.x - o.x, oy: p.y - o.y }; return; }
     }
   },
-  move(p) { if (!this.drag) return; this[this.drag.id].x = p.x - this.drag.ox; this[this.drag.id].y = p.y - this.drag.oy; },
+  move(p) {
+    if (!this.drag) return;
+    const o = this[this.drag.id];
+    const nx = p.x - this.drag.ox, ny = p.y - this.drag.oy;
+    o.vx = nx - o.x; o.vy = ny - o.y;
+    o.x = nx; o.y = ny;
+  },
   up() {
     if (!this.drag) return;
     const id = this.drag.id; this.drag = null;
@@ -1590,6 +2014,10 @@ const Dolly = {
       } else this.fail("Discard the egg nucleus on the red X so genomes do not mix.");
     } else if (id === "soma" && this.state === "transfer") {
       if (!this.starved) return this.fail("Serum-starve the mammary cell first. Dolly’s donor was in G0.");
+      if (this.nucE && !this.nucE.gone) {
+        this.mixed = true;
+        return this.fail("Egg nucleus still inside. Two genomes mixed — this oocyte cannot make Dolly. Discard the haploid nucleus first.");
+      }
       if (this.egg && dist(this.soma, this.egg) < 36) {
         this.recon = { x: this.egg.x, y: this.egg.y, r: 22 };
         this.soma.gone = true; this.egg.gone = true; this.state = "tube"; audio.ok();
@@ -1605,7 +2033,7 @@ const Dolly = {
     } else if (id === "embryo" && this.state === "implant") {
       if (this.cleave < 2) return this.fail("Wait. Mitosis must copy the donor nucleus to 4–8 cells before implant.");
       if (this.hit(this.embryo, L.surr)) {
-        this.embryo.gone = true; this.born = true; this.state = "birth"; audio.ok();
+        this.embryo.gone = true; this.born = true; this.state = "birth"; audio.chime();
         NB.add("dolly", "Embryo implanted in Blackface surrogate. Lamb born.");
         toast("White face like the nuclear donor. Next: match the barcode, not the ewe who carried her.", "");
       } else this.fail("Implant the embryo in the Blackface surrogate.");
@@ -1619,7 +2047,7 @@ const Dolly = {
     this.state = "implant";
     const W = this.layout();
     this.embryo = { x: W.surr.x - 150, y: W.surr.y, r: 16 };
-    audio.ok();
+    audio.pulse();
     NB.add("dolly", "Pulse applied. Mitosis copies donor nuclear DNA.");
     toast("Mitosis copies the donor nucleus. No genes were added by the current.", "");
   },
@@ -1770,7 +2198,11 @@ const Plant = {
 
     const dx = w * 0.52, dy = h * 0.58;
     this.drawFlask(ctx, dx, dy);
-    if (this.cutDone && this.ex && !this.plated) this.drawExplant(ctx, this.ex.x, this.ex.y, 1);
+    if (this.cutDone && this.ex && !this.plated && !this.drag) coast(this.ex, 0.9);
+    if (this.cutDone && this.ex && !this.plated) {
+      snapRing(ctx, dx, dy, 92, dist(this.ex, { x: dx, y: dy }) < 120);
+      this.drawExplant(ctx, this.ex.x, this.ex.y, 1);
+    }
 
     ctx.textAlign = "center";
     ctx.fillStyle = "rgba(212,180,138,0.7)";
@@ -1891,12 +2323,17 @@ const Plant = {
       return;
     }
     if (p.x < innerWidth * 0.42 && p.y > innerHeight * 0.18 && p.y < innerHeight * 0.88) {
-      if (!this.tissue) { this.tissue = true; audio.ok(); toast("Shoot selected. Now click Cut explant, or click the plant again.", ""); return; }
-      if (!this.cutDone) { this.takeCut(); return; }
+      if (!this.tissue) { this.tissue = true; audio.ok(); toast("Shoot selected. Drag from the parent to take an explant.", ""); return; }
+      if (!this.cutDone) { this.takeCut(); this.drag = true; return; }
     }
     if (this.ex && dist(p, this.ex) < 28) this.drag = true;
   },
-  move(p) { if (this.drag && this.ex) { this.ex.x = p.x; this.ex.y = p.y; } },
+  move(p) {
+    if (this.drag && this.ex) {
+      this.ex.vx = p.x - this.ex.x; this.ex.vy = p.y - this.ex.y;
+      this.ex.x = p.x; this.ex.y = p.y;
+    }
+  },
   up(p) {
     if (!this.drag) return;
     this.drag = false;
@@ -1908,13 +2345,14 @@ const Plant = {
     if (this.cutDone) return;
     this.cutDone = true;
     this.ex = { x: innerWidth * 0.28, y: innerHeight * 0.38 };
-    audio.ok();
-    toast("Explant cut. Sterilise, then drag it into the flask.", "");
+    audio.snip();
+    toast("Explant in the forceps. Sterilise, then drop it in the flask.", "");
   },
   ster() { if (!this.cutDone) return toast("Cut first.", "warn"); this.sterile = true; audio.ok(); NB.add("plant", "Surface sterilised."); },
   plate() {
     if (!this.cutDone) return;
     this.plated = true;
+    audio.place();
     clearInterval(this.timer);
     this.timer = setInterval(() => this.tickDay(), 1100);
     NB.add("plant", this.sterile ? "Plated on sterile medium." : "Plated without sterilisation.");
@@ -1942,10 +2380,11 @@ function bindPlantDock() {
 const Bac = {
   n: 1, phase: 0, nut: 80, temp: 37, run: false, accu: 0, hist: [1], view: "micro", cam: 1, gens: 0, _hud: "",
   reset() {
-    Object.assign(this, { n: 1, phase: 0, accu: 0, hist: [1], run: false, cam: 1, gens: 0, view: "micro", _hud: "" });
+    Object.assign(this, { n: 1, phase: 0, accu: 0, hist: [1], run: false, cam: 1, gens: 0, view: "micro", _hud: "", dead: false });
   },
   factor() {
     const tf = Math.max(0, 1 - Math.abs(this.temp - 37) / 28);
+    if (this.temp >= 48) { this.dead = true; this.run = false; return 0; }
     return (this.nut / 100) * tf;
   },
   tick() {
@@ -1957,7 +2396,7 @@ const Bac = {
         this.accu = 0; this.n *= 2; this.gens++; this.hist.push(this.n);
         NB.add("bac", "Generation " + this.gens + " · n = " + this.n);
         if (this.n >= 32) { markDone("bac"); markSim("bac"); }
-        audio.ok();
+        audio.pop();
       }
     }
     this.cam = lerp(this.cam, this.view === "colony" ? 0.42 : 1, 0.07);
@@ -1968,7 +2407,8 @@ const Bac = {
     else this.drawMicro(ctx, w, h);
     this.graph(ctx, w, h);
     const fizz = this.phase < 0.28 ? "DNA replicating" : this.phase < 0.52 ? "cell elongating" : this.phase < 0.78 ? "septum forming" : "splitting into two clones";
-    const msg = !this.run ? "One cell. Press Culture to start binary fission." :
+    const msg = this.dead ? "Culture killed. Proteins denatured above ~48°C. Reset and keep near 37°C." :
+      !this.run ? "Find the cell in the microscope. Click it to start binary fission." :
       f < 0.2 ? "Growth stalled. Bring temperature near 37°C and raise nutrients." :
       "n = " + this.n + "  ·  gen " + this.gens + "  ·  " + fizz + "  ·  " + this.temp + "°C";
     if (this._hud !== msg) {
@@ -1983,9 +2423,15 @@ const Bac = {
     ctx.rotate(rot);
     const L = len * (1 + (split ? 0 : phase * 0.45));
     const g = ctx.createLinearGradient(-L, 0, L, 0);
-    g.addColorStop(0, "rgba(30,80,55,0.9)");
-    g.addColorStop(0.5, "rgba(90,180,130,0.55)");
-    g.addColorStop(1, "rgba(20,60,40,0.92)");
+    if (this.dead) {
+      g.addColorStop(0, "rgba(70,62,48,0.9)");
+      g.addColorStop(0.5, "rgba(120,110,90,0.5)");
+      g.addColorStop(1, "rgba(50,44,36,0.92)");
+    } else {
+      g.addColorStop(0, "rgba(30,80,55,0.9)");
+      g.addColorStop(0.5, "rgba(90,180,130,0.55)");
+      g.addColorStop(1, "rgba(20,60,40,0.92)");
+    }
     ctx.beginPath();
     ctx.roundRect?.(-L, -thick, L * 2, thick * 2, thick);
     if (!ctx.roundRect) { ctx.ellipse(0, 0, L, thick, 0, 0, Math.PI * 2); }
@@ -2082,6 +2528,8 @@ const Bac = {
       callout("Binary fission", "DNA replicates, the cell elongates, a septum forms, two genetically identical cells. A colony is a clone of the founder until mutation.", p.x, p.y);
       return;
     }
+    if (this.dead) { toast("Proteins denatured. Reset — cloning cannot restart from a killed culture.", "warn"); audio.bad(); return; }
+    if (!this.run) { this.run = true; audio.ok(); toast("Founder cell dividing. DNA → elongate → septum → two clones.", ""); return; }
     this.view = this.view === "micro" ? "colony" : "micro";
     toast(this.view === "micro" ? "Microscope — watch one fission cycle." : "Colony — all these cells share one genome.", "");
   },
@@ -2136,11 +2584,15 @@ const Tg = {
     drawDust(ctx, w, h, t, 26);
     this.drawHuman(ctx, w, h);
     this.drawHost(ctx, w, h);
-    if (this.chip) this.drawCassette(ctx, this.chip.x, this.chip.y, 1);
+    if (this.chip) {
+      const H = this.host(w, h);
+      snapRing(ctx, H.x, H.y, 96, dist(this.chip, H) < 70);
+      this.drawCassette(ctx, this.chip.x, this.chip.y, 1);
+    }
     if (this.harvested) this.drawVial(ctx, w, h);
     const map = {
       pick: "Select the human insulin gene. Haemoglobin and keratin are decoys.",
-      isolated: "Drag the cassette onto the bacterial host, or press Introduce.",
+      isolated: "Insulin cassette in the forceps. Drop it onto the bacterial host.",
       insert: "Gene seating in the host genome…",
       ready: "The host is transgenic. Clone it so the gene is not lost.",
       culture: "Binary fission copies the inserted gene. Insulin yield " + Math.round(this.yield) + "%.",
@@ -2231,11 +2683,13 @@ const Tg = {
     const w = innerWidth, h = innerHeight;
     if (inspect) return this.inspectAt(p);
     if (this.chip && dist(p, this.chip) < 30) { this.chip.grab = true; return; }
+    if (this.inserted && !this.cloned && dist(p, this.host(w, h)) < 90) { this.clone(); return; }
+    if (this.cloned && this.yield >= 55 && !this.harvested && dist(p, this.host(w, h)) < 90) { this.harvest(); return; }
     for (const g of this.genes(w, h)) {
       if (dist(p, g) < 22) {
         this.selected = g.id;
-        if (!g.ok) this.fail("That is not the insulin gene. Select the gold INSULIN locus.");
-        else audio.ok();
+        if (!g.ok) this.fail("Wrong locus. Haemoglobin and keratin will not make insulin. Find INSULIN.");
+        else { audio.ok(); if (!this.isolated) this.isolate(); }
         return;
       }
     }
@@ -2270,7 +2724,7 @@ const Tg = {
   },
   harvest() {
     if (this.yield < 55) return toast("Wait until the culture produces enough insulin.", "warn");
-    this.harvested = true; audio.ok();
+    this.harvested = true; audio.chime();
     NB.add("tg", "Human insulin collected from clonal transgenic culture.");
     toast("Product collected. The hosts remain genetically identical.", "");
   },
