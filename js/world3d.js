@@ -7,11 +7,11 @@ let reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const look = new THREE.Vector3();
 const camPos = new THREE.Vector3(0, 0.2, 16);
 const palettes = {
-  intro: { fog: 0x05080a, cell: 0x3d8f72, dna: 0xc4a882 },
-  lab: { fog: 0x070b12, cell: 0x4a7a8a, dna: 0x8aa8b8 },
-  greenhouse: { fog: 0x061208, cell: 0x3d8a48, dna: 0xc2b06a },
-  bacteria: { fog: 0x06140f, cell: 0x4aa878, dna: 0xd2c07a },
-  gene: { fog: 0x0c0814, cell: 0x6a4a8a, dna: 0xd4a060 }
+  intro: { fog: 0x04070a, cell: 0x3d8f72, dna: 0xe0c49a },
+  lab: { fog: 0x060b12, cell: 0x4a8498, dna: 0x9ec0d0 },
+  greenhouse: { fog: 0x051208, cell: 0x3d8a48, dna: 0xd2bc6a },
+  bacteria: { fog: 0x05140f, cell: 0x4ab888, dna: 0xe0c87a },
+  gene: { fog: 0x0c0816, cell: 0x7a58a0, dna: 0xe0b060 }
 };
 let pal = palettes.intro;
 
@@ -19,20 +19,23 @@ export function initWorld(canvas) {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1));
   renderer.setSize(innerWidth, innerHeight, false);
-  renderer.setClearColor(0x05080a, 1);
+  renderer.setClearColor(0x04070a, 1);
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x05080a, 0.055);
+  scene.fog = new THREE.FogExp2(0x04070a, 0.05);
   camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 80);
   camera.position.copy(camPos);
   clock = new THREE.Clock();
 
-  scene.add(new THREE.AmbientLight(0x1a2420, 0.9));
-  const key = new THREE.DirectionalLight(0xd8c8a0, 1.1);
+  scene.add(new THREE.AmbientLight(0x182820, 1.05));
+  const key = new THREE.DirectionalLight(0xf0dcb8, 1.25);
   key.position.set(4, 6, 8);
   scene.add(key);
-  const rim = new THREE.PointLight(0x4ec4a0, 1.4, 24);
+  const rim = new THREE.PointLight(0x5ee0b8, 1.7, 28);
   rim.position.set(-3, -1, 4);
   scene.add(rim);
+  const fill = new THREE.PointLight(0xe0c49a, 0.7, 22);
+  fill.position.set(5, -2, -3);
+  scene.add(fill);
 
   buildCells();
   buildDust();

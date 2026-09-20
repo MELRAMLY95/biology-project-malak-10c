@@ -1,9 +1,9 @@
-import { $, $$, audio, toast, NB } from "./core.js?v=29";
-import { initWorld, skipIntro, setWorld } from "./world3d.js?v=29";
-import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js?v=29";
+import { $, $$, audio, toast, NB } from "./core.js?v=30";
+import { initWorld, skipIntro, setWorld } from "./world3d.js?v=30";
+import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js?v=30";
 import {
   bindLearnUi, showLearn, showQuiz, showExam, showGlossary, renderProgress, learnDelta, showEthics, ethDelta
-} from "./ui.js?v=29";
+} from "./ui.js?v=30";
 
 const gl = document.getElementById("gl");
 const sim = document.getElementById("sim");
