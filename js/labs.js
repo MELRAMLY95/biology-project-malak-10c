@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js?v=37";
+import { markSim } from "./ui.js?v=38";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js?v=37";
+} from "./core.js?v=38";
 
 const sim = $("#sim");
 let scene = "intro";

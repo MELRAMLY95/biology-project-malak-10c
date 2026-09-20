@@ -13,15 +13,12 @@ export const store = {
 export const audio = {
   on: false,
   ctx: null,
-  hum: null,
-  _noise: null,
+  _white: null,
+  _brown: null,
   toggle() {
     this.on = !this.on;
-    if (this.on) {
-      this.unlock();
-      this.startHum();
-      this.boot();
-    } else this.stopHum();
+    if (this.on) this.unlock();
+    else this.stopHum();
     return this.on;
   },
   unlock() {
@@ -33,92 +30,120 @@ export const audio = {
     this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
     return this.ctx;
   },
-  noise() {
-    if (this._noise) return this._noise;
+  out() {
+    if (this._out) return this._out;
     const c = this.ctxGet();
-    const b = c.createBuffer(1, Math.floor(c.sampleRate * 0.35), c.sampleRate);
+    this._out = c.createGain();
+    this._out.gain.value = 0.42;
+    this._out.connect(c.destination);
+    return this._out;
+  },
+  noise(kind = "white") {
+    const key = kind === "brown" ? "_brown" : "_white";
+    if (this[key]) return this[key];
+    const c = this.ctxGet();
+    const n = Math.floor(c.sampleRate * 0.8);
+    const b = c.createBuffer(1, n, c.sampleRate);
     const d = b.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    this._noise = b;
+    let last = 0;
+    for (let i = 0; i < n; i++) {
+      const w = Math.random() * 2 - 1;
+      if (kind === "brown") {
+        last = (last + w * 0.02) * 0.98;
+        d[i] = last * 4.2;
+      } else d[i] = w;
+    }
+    this[key] = b;
     return b;
   },
-  env(g, t0, peak, dur) {
+  env(g, t0, peak, dur, atk = 0.006) {
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t0 + atk);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   },
-  tone(freq, dur = 0.09, vol = 0.08, type = "sine", slide) {
+  tone(freq, dur = 0.08, vol = 0.04, type = "sine", slide, atk) {
     if (!this.on) return;
     const c = this.unlock();
     const t0 = c.currentTime;
     const o = c.createOscillator(), g = c.createGain();
     o.type = type;
     o.frequency.setValueAtTime(freq, t0);
-    if (slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + dur);
-    this.env(g, t0, vol, dur);
-    o.connect(g); g.connect(c.destination);
-    o.start(t0); o.stop(t0 + dur + 0.02);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, slide), t0 + dur * 0.85);
+    this.env(g, t0, vol, dur, atk);
+    o.connect(g); g.connect(this.out());
+    o.start(t0); o.stop(t0 + dur + 0.03);
   },
-  burst(vol = 0.05, dur = 0.12, hp = 800) {
+  noiseHit(opts = {}) {
     if (!this.on) return;
+    const { vol = 0.04, dur = 0.1, type = "bandpass", freq = 900, q = 1.2, kind = "white", atk = 0.004 } = opts;
     const c = this.unlock();
     const t0 = c.currentTime;
     const src = c.createBufferSource();
-    src.buffer = this.noise();
+    src.buffer = this.noise(kind);
     const f = c.createBiquadFilter();
-    f.type = "highpass"; f.frequency.value = hp;
+    f.type = type;
+    f.frequency.value = freq;
+    f.Q.value = q;
     const g = c.createGain();
-    this.env(g, t0, vol, dur);
-    src.connect(f); f.connect(g); g.connect(c.destination);
-    src.start(t0); src.stop(t0 + dur + 0.02);
+    this.env(g, t0, vol, dur, atk);
+    src.connect(f); f.connect(g); g.connect(this.out());
+    src.start(t0); src.stop(t0 + dur + 0.04);
   },
-  startHum() {
-    this.stopHum();
-    const c = this.unlock();
-    const make = (freq, type, vol) => {
-      const o = c.createOscillator(), g = c.createGain();
-      o.type = type; o.frequency.value = freq;
-      g.gain.value = vol;
-      o.connect(g); g.connect(c.destination);
-      o.start();
-      return { o, g };
-    };
-    this.hum = [
-      make(58, "sine", 0.018),
-      make(116.5, "triangle", 0.008)
-    ];
-  },
+  startHum() {},
   stopHum() {
     (this.hum || []).forEach((n) => { try { n.o.stop(); } catch {} });
     this.hum = null;
   },
-  boot() {
-    this.tone(392, 0.12, 0.07, "sine");
-    setTimeout(() => this.tone(523, 0.14, 0.08, "sine"), 90);
-    setTimeout(() => this.tone(659, 0.22, 0.07, "triangle"), 180);
+  boot() {},
+  click() {
+    this.noiseHit({ vol: 0.028, dur: 0.035, type: "highpass", freq: 2400, q: 0.7 });
+    this.tone(2100, 0.018, 0.018, "sine");
   },
-  click() { this.tone(980, 0.04, 0.05, "triangle"); },
   ok() {
-    this.tone(523, 0.08, 0.07, "sine");
-    this.tone(784, 0.14, 0.05, "triangle");
+    this.noiseHit({ vol: 0.022, dur: 0.05, type: "bandpass", freq: 1400, q: 2 });
+    this.tone(520, 0.07, 0.028, "sine");
   },
   bad() {
-    this.burst(0.06, 0.1, 400);
-    this.tone(164, 0.22, 0.1, "square", 90);
+    this.noiseHit({ vol: 0.045, dur: 0.12, type: "lowpass", freq: 420, q: 0.6, kind: "brown", atk: 0.002 });
+    this.tone(92, 0.16, 0.05, "sine", 48, 0.004);
   },
-  grab() { this.tone(240, 0.07, 0.06, "sine", 420); this.burst(0.03, 0.06, 1200); },
-  place() { this.tone(440, 0.06, 0.07, "sine"); this.tone(660, 0.12, 0.045, "triangle"); },
-  snap() { this.tone(880, 0.05, 0.06, "square"); this.burst(0.04, 0.05, 2000); },
-  wet() { this.burst(0.07, 0.16, 300); this.tone(180, 0.18, 0.04, "sine", 90); },
+  grab() {
+    this.noiseHit({ vol: 0.03, dur: 0.07, type: "bandpass", freq: 380, q: 1.4, kind: "brown" });
+    this.tone(180, 0.05, 0.02, "sine", 140);
+  },
+  place() {
+    this.noiseHit({ vol: 0.038, dur: 0.09, type: "lowpass", freq: 280, q: 0.8, kind: "brown", atk: 0.003 });
+    this.tone(110, 0.08, 0.032, "sine", 70);
+  },
+  snap() {
+    this.noiseHit({ vol: 0.04, dur: 0.028, type: "highpass", freq: 3200, q: 0.9 });
+    this.tone(1600, 0.02, 0.02, "sine");
+  },
+  wet() {
+    this.noiseHit({ vol: 0.05, dur: 0.22, type: "lowpass", freq: 520, q: 0.5, kind: "brown", atk: 0.03 });
+    this.noiseHit({ vol: 0.018, dur: 0.14, type: "bandpass", freq: 1100, q: 2.4, atk: 0.02 });
+  },
   pulse() {
-    this.burst(0.08, 0.2, 200);
-    this.tone(90, 0.28, 0.12, "sawtooth", 40);
-    this.tone(720, 0.08, 0.04, "sine");
+    this.noiseHit({ vol: 0.055, dur: 0.08, type: "highpass", freq: 1800, q: 0.6, atk: 0.001 });
+    this.tone(70, 0.22, 0.06, "sine", 32, 0.002);
+    this.tone(240, 0.05, 0.018, "sine", 90);
   },
-  copy() { this.tone(330, 0.2, 0.05, "sine", 660); },
-  snip() { this.burst(0.07, 0.05, 1800); this.tone(1400, 0.04, 0.04, "square"); },
-  pop() { this.tone(620, 0.07, 0.05, "sine", 280); },
-  chime() { this.tone(659, 0.16, 0.07, "sine"); this.tone(988, 0.28, 0.05, "triangle"); }
+  copy() {
+    this.noiseHit({ vol: 0.02, dur: 0.16, type: "bandpass", freq: 2400, q: 3, atk: 0.04 });
+    this.tone(880, 0.12, 0.012, "sine", 1320, 0.05);
+  },
+  snip() {
+    this.noiseHit({ vol: 0.045, dur: 0.03, type: "highpass", freq: 2200, q: 1.1 });
+    setTimeout(() => this.noiseHit({ vol: 0.032, dur: 0.025, type: "highpass", freq: 2600, q: 1.2 }), 38);
+  },
+  pop() {
+    this.noiseHit({ vol: 0.028, dur: 0.05, type: "bandpass", freq: 700, q: 1.8, kind: "brown" });
+    this.tone(340, 0.08, 0.03, "sine", 120, 0.004);
+  },
+  chime() {
+    this.tone(784, 0.14, 0.03, "sine", null, 0.01);
+    this.tone(1175, 0.2, 0.018, "sine", null, 0.02);
+  }
 };
 
 export function toast(msg, kind = "") {
