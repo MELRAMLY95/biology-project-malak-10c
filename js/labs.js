@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js?v=41";
+import { markSim } from "./ui.js?v=42";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js?v=41";
+} from "./core.js?v=42";
 
 const sim = $("#sim");
 let scene = "intro";
@@ -1031,7 +1031,7 @@ const SCNT = {
   nucE: { out: false, anim: 0 },
   mistakes: 0, div: 0, play: 0, pulse: 0, implanted: false, _hud: "",
   reset(log) {
-    Object.assign(this, { state: "idle", ox: 0, oy: 0, zoom: 1, focus: 0.82, pip: { x: innerWidth * 0.48, y: 90, tx: innerWidth * 0.48, ty: 90, load: null }, egg: { r: 118, enuc: false }, nucD: { out: false, inEgg: false, anim: 0 }, nucE: { out: false, anim: 0 }, mistakes: 0, div: 0, play: 0, pulse: 0, implanted: false, settle: 0, grab: false, draggingSample: false, hover: null, _hud: "", autoAim: false, pb: null, lastGen: 0 });
+    Object.assign(this, { state: "idle", ox: 0, oy: 0, zoom: 1, focus: 0.82, pip: { x: innerWidth * 0.48, y: 90, tx: innerWidth * 0.48, ty: 90, load: null }, egg: { r: 118, enuc: false }, nucD: { out: false, inEgg: false, anim: 0 }, nucE: { out: false, anim: 0 }, mistakes: 0, div: 0, play: 0, pulse: 0, implanted: false, settle: 0, grab: false, draggingSample: false, hover: null, _hud: "", autoAim: false, pb: null, lastGen: 0, lookZ: 1, _now: performance.now() });
     const z = $("#scntZoom"); if (z) z.value = 1;
     const f = $("#scntFocus"); if (f) f.value = "0.82";
     const p = $("#pulse"); if (p) { p.disabled = true; const i = p.querySelector("i"); if (i) i.style.width = "0"; }
@@ -1108,22 +1108,31 @@ const SCNT = {
     sim.classList.add("shake");
   },
   tick() {
-    this.pip.x = lerp(this.pip.x, this.pip.tx, 0.2);
-    this.pip.y = lerp(this.pip.y, this.pip.ty, 0.2);
+    const now = performance.now();
+    const dt = Math.min(0.033, Math.max(0.008, (now - (this._now || now - 16)) / 1000));
+    this._now = now;
+    const k = dt * 60;
+    this.pip.x = lerp(this.pip.x, this.pip.tx, 0.18);
+    this.pip.y = lerp(this.pip.y, this.pip.ty, 0.18);
     if (this.nucD.anim > 0) this.nucD.anim *= 0.9;
     if (this.nucE.anim > 0) this.nucE.anim *= 0.9;
     if (this.pulse > 0.02) this.pulse *= 0.94; else this.pulse = 0;
-    if (this.settle > 0 && this.settle < 1) this.settle = Math.min(1, this.settle + 0.035);
+    if (this.settle > 0 && this.settle < 1) this.settle = Math.min(1, this.settle + 0.028 * k);
     if (this.settle >= 1 && this.state === "seating") {
       this.nucD.inEgg = true; this.pip.load = null; this.state = "activate";
       const p = $("#pulse"); if (p) p.disabled = false;
       NB.add("scnt", "Nucleus seated. Reconstructed oocyte.");
       toast("Ready to activate. The genome is already the donor’s.", "");
     }
+    const aimZ = this.state === "dividing" && this.div < 1 ? 1.52
+      : this.state === "dividing" && this.div < 2 ? 1.28
+      : this.state === "dividing" ? 1.08
+      : this.state === "compare" ? 1 : this.zoom;
+    this.lookZ = lerp(this.lookZ || 1, aimZ, 0.07 * k);
     if (this.play && this.state === "dividing") {
       const gen = Math.floor(this.div);
-      const spd = gen === 0 ? 0.00155 : gen < 3 ? 0.0024 : 0.0031;
-      this.div = Math.min(5.2, this.div + spd * this.play);
+      const perSec = gen === 0 ? 0.055 : gen === 1 ? 0.078 : gen < 4 ? 0.1 : 0.12;
+      this.div = Math.min(5.2, this.div + perSec * this.play * dt);
       if (Math.floor(this.div) > this.lastGen && this.lastGen < 5) {
         this.lastGen = Math.floor(this.div);
         audio.pop();
@@ -1161,11 +1170,11 @@ const SCNT = {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
     drawDust(ctx, w, h, t, 56);
-    const lookZ = this.zoom * ((this.state === "dividing" && this.div < 1.05) ? 1.22 : 1);
+    const lookZ = this.state === "dividing" || this.state === "compare" ? (this.lookZ || 1.2) : this.zoom;
     ctx.translate(cx, cy);
     ctx.scale(lookZ, lookZ);
     ctx.translate(-cx, -cy);
-    const blur = (1 - this.focus) * 2.4;
+    const blur = (this.state === "dividing" || this.state === "compare") ? 0 : (1 - this.focus) * 2.4;
     if (blur > 0.35) ctx.filter = `blur(${blur}px)`;
 
     if (this.state === "dividing" || this.state === "compare") this.drawDiv(ctx, w, h);
@@ -1323,180 +1332,189 @@ const SCNT = {
   drawDiv(ctx, w, h) {
     const gen = Math.min(5, Math.floor(this.div));
     const u = this.frac();
-    const names = ["reconstructed oocyte (1-cell)", "2-cell embryo", "4-cell embryo", "8-cell embryo", "morula", "blastocyst"];
-    const cx = w / 2, cy = h / 2 + 8;
-    ctx.fillStyle = "#d4b48a"; ctx.font = "16px IBM Plex Sans"; ctx.textAlign = "center";
-    ctx.fillText(names[gen], cx, cy - 168);
-    ctx.font = "12px IBM Plex Mono";
-    ctx.fillStyle = "rgba(200,220,210,0.85)";
-    ctx.fillText(this.cleavePhase(), cx, cy - 146);
-    ctx.font = "11px IBM Plex Sans";
-    ctx.fillStyle = "rgba(224,180,120,0.88)";
-    ctx.fillText(this.state === "compare" ? "Clone nuclear DNA = somatic donor  ·  mitochondria usually from the egg  ·  not the surrogate" : "The pulse started this cycle. It did not write genes. Wait for blastocyst to implant.", cx, cy - 126);
+    const names = ["reconstructed oocyte · 1-cell", "2-cell embryo", "4-cell embryo", "8-cell embryo", "morula", "blastocyst"];
+    const cx = w / 2, cy = h / 2 + 18;
+    ctx.fillStyle = "#e8c878";
+    ctx.font = "18px IBM Plex Sans"; ctx.textAlign = "center";
+    ctx.fillText(names[gen], cx, cy - 178);
+    ctx.font = "14px IBM Plex Mono";
+    ctx.fillStyle = "rgba(180,255,210,0.95)";
+    ctx.fillText(this.cleavePhase(), cx, cy - 154);
+    ctx.font = "12px IBM Plex Sans";
+    ctx.fillStyle = "rgba(224,180,120,0.9)";
+    ctx.fillText(this.state === "compare" ? "Nuclear DNA = somatic donor  ·  mitochondria from the egg  ·  not the surrogate" : "Pulse started the cycle. It did not write DNA. Green = donor chromatids. Gold = sisters.", cx, cy - 132);
     ctx.textAlign = "start";
 
-    const zona = gen === 0 ? 108 : 48 + Math.min(86, [0, 2, 4, 8, 16, 24][gen] * 3.2);
+    const zona = gen === 0 ? 118 : 52 + Math.min(88, [0, 2, 4, 8, 16, 24][gen] * 3.4);
     this.drawZona(ctx, cx, cy, zona, 0.95);
-    this.drawEggMito(ctx, cx, cy, zona * 0.72);
+    if (gen > 0) this.drawEggMito(ctx, cx, cy, zona * 0.78);
 
-    if (gen === 0) this.drawFirstCleavage(ctx, cx, cy, 78, u);
+    if (gen === 0) this.drawFirstCleavage(ctx, cx, cy, 88, u);
     else this.drawBlastomeres(ctx, cx, cy, gen, u, zona);
 
-    this.drawSeq(ctx, cx, cy + zona + 36, SCNT_SEQ, "donor nuclear barcode  ·  every blastomere");
-
+    this.drawSeq(ctx, cx, cy + zona + 28, SCNT_SEQ, "donor nuclear barcode  ·  every blastomere");
     const frac = Math.min(1, this.div / 5.2);
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.fillRect(cx - 100, cy + zona + 58, 200, 5);
-    ctx.fillStyle = "#d4b48a";
-    ctx.fillRect(cx - 100, cy + zona + 58, 200 * frac, 5);
-    ctx.fillStyle = "rgba(200,210,200,0.55)";
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fillRect(cx - 110, cy + zona + 50, 220, 6);
+    ctx.fillStyle = "#8ee0b8";
+    ctx.fillRect(cx - 110, cy + zona + 50, 220 * frac, 6);
+    ctx.fillStyle = "rgba(200,210,200,0.6)";
     ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
-    ctx.fillText("cell cycle  →  blastocyst", cx, cy + zona + 76);
+    ctx.fillText("reprogramming → S-phase → mitosis → blastocyst", cx, cy + zona + 70);
     ctx.textAlign = "start";
-
-    if (this.state === "compare") this.drawSurrogateNote(ctx, cx, cy + zona + 100);
+    if (this.state === "compare") this.drawSurrogateNote(ctx, cx, cy + zona + 96);
   },
   drawFirstCleavage(ctx, cx, cy, r, u) {
     const mu = this.mitoU();
-    const furrow = u > 0.84 ? this.ease((u - 0.84) / 0.16) : 0;
-    const rx = r * (1 + this.pulse * 0.08);
-    drawCell(ctx, {
-      x: cx, y: cy, r: rx,
-      t, kind: "egg", showNuc: false, pulse: this.pulse,
-      deform: furrow
+    const furrow = u > 0.82 ? this.ease((u - 0.82) / 0.18) : 0;
+    const gap = furrow * 46;
+    const cells = furrow > 0.12
+      ? [{ x: cx - gap, y: cy, r: r * (1 - furrow * 0.18) }, { x: cx + gap, y: cy, r: r * (1 - furrow * 0.18) }]
+      : [{ x: cx, y: cy, r: r * (1 + this.pulse * 0.1) }];
+    cells.forEach((c) => {
+      drawCell(ctx, { x: c.x, y: c.y, r: c.r, t, kind: "egg", showNuc: false, pulse: this.pulse, deform: furrow * 0.6 });
     });
-    if (furrow > 0.08) {
-      ctx.strokeStyle = `rgba(255,230,200,${0.25 + furrow * 0.5})`;
-      ctx.lineWidth = 1.5 + furrow * 6;
-      ctx.beginPath(); ctx.moveTo(cx - r * 1.05, cy); ctx.lineTo(cx + r * 1.05, cy); ctx.stroke();
+    if (furrow > 0.06 && cells.length === 1) {
+      ctx.strokeStyle = `rgba(255,236,200,${0.35 + furrow * 0.55})`;
+      ctx.lineWidth = 2 + furrow * 8;
+      ctx.beginPath(); ctx.moveTo(cx, cy - r * 1.05); ctx.lineTo(cx, cy + r * 1.05); ctx.stroke();
     }
     if (u < 0.12) {
-      const swell = 16 + u / 0.12 * 8;
-      this.chromatin(ctx, cx - 4, cy - 4, swell, "donor");
-      ctx.fillStyle = "rgba(142,224,184,0.75)";
-      ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
-      ctx.fillText("nucleus swelling  ·  reprogramming", cx, cy + r + 18);
-      ctx.textAlign = "start";
+      this.chromatin(ctx, cx - 4, cy - 4, 22 + this.ease(u / 0.12) * 14, "donor");
     } else if (u < 0.26) {
-      this.drawSphase(ctx, cx, cy, this.sProg());
+      this.drawSphase(ctx, cx, cy, this.sProg(), true);
+    } else if (cells.length === 1) {
+      this.drawSpindle(ctx, cx, cy, r * 0.92, mu, 1.35);
     } else {
-      this.drawSpindle(ctx, cx, cy, r, mu);
+      this.chromatin(ctx, cells[0].x - 3, cells[0].y - 3, 16, "donor");
+      this.chromatin(ctx, cells[1].x - 3, cells[1].y - 3, 16, "donor");
     }
-    if (this.pb) this.drawPolarBody(ctx, cx + r + 28, cy - r * 0.7);
+    if (this.pb) this.drawPolarBody(ctx, cx + r + 36, cy - r * 0.72);
   },
   drawBlastomeres(ctx, cx, cy, gen, u, zona) {
     const n = [1, 2, 4, 8, 16, 22][gen];
     const mu = this.mitoU();
-    const sPhase = (gen === 0 ? u < 0.26 : u < 0.16);
-    const dividing = !sPhase && gen < 5;
+    const sPhase = u < 0.16;
     if (gen >= 5) {
-      ctx.beginPath(); ctx.arc(cx + 18, cy - 12, zona * 0.38, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(20,40,36,0.5)"; ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = "rgba(212,180,138,0.85)"; ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
-      ctx.fillText("blastocoel", cx + 18, cy - 12);
-      ctx.fillText("inner cell mass", cx - zona * 0.38, cy + 10);
-      ctx.fillText("trophectoderm", cx, cy + zona - 20);
+      ctx.beginPath(); ctx.arc(cx + 20, cy - 14, zona * 0.36, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(12,28,26,0.55)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "rgba(232,210,150,0.9)"; ctx.font = "12px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText("blastocoel", cx + 20, cy - 14);
+      ctx.fillText("inner cell mass", cx - zona * 0.36, cy + 12);
+      ctx.fillText("trophectoderm", cx, cy + zona - 22);
       ctx.textAlign = "start";
     }
+    const furrow = !sPhase && u > 0.82 ? this.ease((u - 0.82) / 0.18) : 0;
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + t * 0.04;
-      const rad = n <= 2 ? (n === 1 ? 0 : 34) : 28 + Math.min(70, n * 2.8);
-      const br = n === 1 ? 58 : Math.max(11, 30 - n * 0.55);
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const rad = n <= 2 ? (n === 1 ? 0 : 48) : 32 + Math.min(68, n * 2.6);
+      const br = n === 1 ? 64 : n === 2 ? 42 : Math.max(14, 34 - n * 0.7);
       const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
-      const showNuc = sPhase || mu < 0.08 || mu > 0.78 || gen >= 5;
+      const showSpin = !sPhase && gen < 5 && i < 2 && mu > 0.02 && mu < 0.9;
       drawCell(ctx, {
-        x, y, r: br,
+        x, y, r: br * (1 - furrow * 0.06),
         t, kind: "soma",
-        showNuc,
+        showNuc: (sPhase || mu < 0.1 || mu > 0.8 || gen >= 5) && !showSpin,
         hot: this.state === "compare" || (gen >= 5 && this.div >= 4.2)
       });
-      if (sPhase && gen < 5) this.drawSphase(ctx, x, y, this.sProg());
-      else if (dividing && i < Math.min(n, 4) && mu > 0.02 && mu < 0.92) this.drawSpindle(ctx, x, y, br, mu);
+      if (sPhase && gen < 5 && i < 2) this.drawSphase(ctx, x, y, this.sProg(), i === 0);
+      else if (showSpin) this.drawSpindle(ctx, x, y, br, mu, n === 2 ? 0.95 : 0.7);
     }
   },
-  drawSphase(ctx, x, y, prog) {
-    this.chromatin(ctx, x, y, 14 + prog * 3, "donor");
+  drawSphase(ctx, x, y, prog, label) {
+    this.chromatin(ctx, x, y, 20 + prog * 6, "donor");
     ctx.save();
     ctx.translate(x, y);
-    ctx.strokeStyle = `rgba(232,188,96,${0.35 + prog * 0.5})`;
-    ctx.lineWidth = 1.4;
-    for (let i = 0; i < 4; i++) {
-      const a = i * 1.1;
+    ctx.strokeStyle = `rgba(232,188,96,${0.5 + prog * 0.45})`;
+    ctx.lineWidth = 2.2;
+    for (let i = 0; i < 5; i++) {
+      const a = i * 0.95;
       ctx.beginPath();
-      ctx.ellipse(Math.cos(a) * 7, Math.sin(a) * 5, 5 + prog * 3, 2, a, 0, Math.PI * 2);
+      ctx.ellipse(Math.cos(a) * 10, Math.sin(a) * 7, 7 + prog * 4, 2.6, a, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.ellipse(Math.cos(a) * 7 + 6 * prog, Math.sin(a) * 5, 4, 1.7, a, 0, Math.PI * 2);
+      ctx.ellipse(Math.cos(a) * 10 + 8 * prog, Math.sin(a) * 7, 5.5, 2.2, a, 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.fillStyle = "rgba(232,210,140,0.8)";
-    ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
-    ctx.fillText("S-phase", 0, 28);
-    ctx.textAlign = "start";
+    if (label) {
+      ctx.fillStyle = "rgba(255,220,140,0.95)";
+      ctx.font = "12px IBM Plex Mono"; ctx.textAlign = "center";
+      ctx.fillText("S-phase  ·  copying donor DNA", 0, 40);
+      ctx.textAlign = "start";
+    }
     ctx.restore();
   },
-  drawSpindle(ctx, x, y, r, u) {
+  drawSpindle(ctx, x, y, r, u, amp = 1) {
     ctx.save();
     ctx.translate(x, y);
-    const envA = u < 0.16 ? 1 - this.ease(u / 0.16) : u > 0.72 ? this.ease((u - 0.72) / 0.16) : 0;
-    if (envA > 0.05) {
+    const envA = u < 0.18 ? 1 - this.ease(u / 0.18) : u > 0.74 ? this.ease((u - 0.74) / 0.16) : 0;
+    if (envA > 0.04) {
       ctx.globalAlpha = envA;
-      ctx.strokeStyle = "rgba(180,230,200,0.6)";
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(0, 0, 18, 14, 0.1, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "rgba(160,240,200,0.85)";
+      ctx.lineWidth = 3 * amp;
+      ctx.beginPath(); ctx.ellipse(0, 0, 26 * amp, 20 * amp, 0.08, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    const n = 6;
-    const poleY = this.mix(7, r * 0.48, Math.min(1, u / 0.3));
-    if (u > 0.1 && u < 0.74) {
-      ctx.fillStyle = "rgba(200,220,255,0.55)";
-      ctx.beginPath(); ctx.arc(0, -poleY, 3.2, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(0, poleY, 3.2, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = `rgba(200,220,255,${0.14 + (0.5 - Math.abs(u - 0.42))})`;
-      ctx.lineWidth = 1;
+    const n = 8;
+    const poleY = this.mix(10 * amp, r * 0.55, Math.min(1, u / 0.28));
+    if (u > 0.08 && u < 0.78) {
+      ctx.fillStyle = "rgba(210,230,255,0.9)";
+      ctx.beginPath(); ctx.arc(0, -poleY, 4.4 * amp, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, poleY, 4.4 * amp, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(190,220,255,${0.28 + (0.55 - Math.abs(u - 0.42))})`;
+      ctx.lineWidth = 1.35 * amp;
       for (let i = 0; i < n; i++) {
-        const p = this.chrPair(i, n, u);
+        const p = this.chrPair(i, n, u, amp);
         ctx.beginPath(); ctx.moveTo(0, -poleY); ctx.lineTo(p.x, p.y1); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, poleY); ctx.lineTo(p.x, p.y2); ctx.stroke();
       }
     }
     for (let i = 0; i < n; i++) {
-      const p = this.chrPair(i, n, u);
-      this.drawChromatid(ctx, p.x, p.y1, 0.82, false);
-      this.drawChromatid(ctx, p.x, p.y2, 0.82, true);
+      const p = this.chrPair(i, n, u, amp);
+      this.drawChromatid(ctx, p.x, p.y1, 1.05 * amp, false);
+      this.drawChromatid(ctx, p.x, p.y2, 1.05 * amp, true);
     }
-    if (u > 0.22 && u < 0.5) {
-      ctx.strokeStyle = `rgba(255,255,255,${0.14 + (0.36 - Math.abs(u - 0.32)) * 0.8})`;
-      ctx.setLineDash([3, 4]);
-      ctx.beginPath(); ctx.moveTo(-r * 0.55, 0); ctx.lineTo(r * 0.55, 0); ctx.stroke();
+    if (u > 0.2 && u < 0.52) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.22 + (0.4 - Math.abs(u - 0.34))})`;
+      ctx.setLineDash([4, 5]);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(-r * 0.62, 0); ctx.lineTo(r * 0.62, 0); ctx.stroke();
       ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = `${Math.round(11 * amp)}px IBM Plex Mono`; ctx.textAlign = "center";
+      ctx.fillText("metaphase plate", 0, r * 0.62);
+      ctx.textAlign = "start";
     }
     ctx.restore();
   },
-  chrPair(i, n, u) {
+  chrPair(i, n, u, amp = 1) {
     const base = (i / n) * Math.PI * 2 - Math.PI / 2;
-    const plateX = (i - (n - 1) / 2) * 10;
-    const proX = Math.cos(base) * 11, proY = Math.sin(base) * 8;
-    const split = this.ease(Math.max(0, (u - 0.36) / 0.26));
-    const toPole = this.ease(Math.max(0, (u - 0.54) / 0.22));
-    const x = this.mix(this.mix(proX, plateX, Math.min(1, u / 0.32)), plateX * (1 - toPole * 0.28), split);
-    const y0 = this.mix(proY, Math.sin(t * 1.3 + i) * 1.2, Math.min(1, u / 0.32));
-    const pole = 20 + toPole * 14;
-    return { x, y1: y0 - split * pole, y2: y0 + 4 * (1 - split) + split * pole };
+    const plateX = (i - (n - 1) / 2) * 15 * amp;
+    const proX = Math.cos(base) * 18 * amp, proY = Math.sin(base) * 13 * amp;
+    const align = Math.min(1, u / 0.3);
+    const split = this.ease(Math.max(0, (u - 0.34) / 0.24));
+    const toPole = this.ease(Math.max(0, (u - 0.52) / 0.24));
+    const x = this.mix(this.mix(proX, plateX, align), plateX * (1 - toPole * 0.22), split);
+    const y0 = this.mix(proY, 0, align);
+    const pole = (32 + toPole * 26) * amp;
+    return { x, y1: y0 - split * pole, y2: y0 + 6 * amp * (1 - split) + split * pole };
   },
   drawChromatid(ctx, x, y, s, twin) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(s, s);
-    ctx.strokeStyle = twin ? "rgba(232,188,96,0.95)" : "rgba(126,230,184,0.95)";
-    ctx.lineWidth = 2.2; ctx.lineCap = "round";
+    ctx.strokeStyle = twin ? "rgba(255,204,96,1)" : "rgba(110,240,176,1)";
+    ctx.shadowColor = twin ? "rgba(255,200,80,0.55)" : "rgba(90,230,160,0.5)";
+    ctx.shadowBlur = 8;
+    ctx.lineWidth = 2.8; ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(-6, -7); ctx.quadraticCurveTo(-1, 0, -6, 7);
-    ctx.moveTo(6, -7); ctx.quadraticCurveTo(1, 0, 6, 7);
+    ctx.moveTo(-8, -10); ctx.quadraticCurveTo(-1, 0, -8, 10);
+    ctx.moveTo(8, -10); ctx.quadraticCurveTo(1, 0, 8, 10);
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.beginPath(); ctx.arc(0, 0, 2.1, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   },
   drawSeq(ctx, x, y, seq, label) {
