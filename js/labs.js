@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js?v=42";
+import { markSim } from "./ui.js?v=43";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js?v=42";
+} from "./core.js?v=43";
 
 const sim = $("#sim");
 let scene = "intro";
@@ -2535,7 +2535,9 @@ const Plant = {
     const ts = 1 - Math.abs(this.temp - 24) / 22;
     const ls = 1 - Math.abs(this.light - 60) / 75;
     const ns = this.nut / 100;
-    const horm = Math.min(this.aux, this.cyto) / 55 * (1 - Math.abs(this.aux - this.cyto) / 140);
+    const cyto = Number(this.cyto) || 52;
+    const aux = Number(this.aux) || 48;
+    const horm = Math.min(aux, cyto) / 55 * (1 - Math.abs(aux - cyto) / 140);
     if (!this.sterile && this.day >= 2) this.contam = true;
     if (this.contam) {
       this.bio = Math.max(0, this.bio - 8);
@@ -2544,22 +2546,12 @@ const Plant = {
     }
     const g = Math.max(0, ts * ls * ns * (0.35 + horm * 0.9)) * 7.2;
     this.bio = Math.min(100, this.bio + g);
-    this.shoots = Math.min(1, this.shoots + (this.cyto / 140) * (this.bio > 28 ? 0.12 : 0.02));
-    this.roots = Math.min(1, this.roots + (this.aux / 140) * (this.bio > 28 ? 0.12 : 0.02));
+    const organ = this.bio > 22 ? 0.14 : 0.06;
+    this.shoots = Math.min(1, this.shoots + 0.05 + (cyto / 100) * organ);
+    this.roots = Math.min(1, this.roots + 0.05 + (aux / 100) * organ);
     if (this.light < 18) this.shoots = Math.max(0.05, this.shoots - 0.04);
     NB.add("plant", `Day ${this.day} · ${this.stage()} · biomass ${Math.round(this.bio)}%`);
     if (this.bio >= 78 && this.sterile && this.shoots > 0.45 && this.roots > 0.35) markDone("plant");
-  },
-  tickDay() {
-    if (!this.plated) return;
-    this.day++;
-    const ts = 1 - Math.abs(this.temp - 24) / 22;
-    const ls = 1 - Math.abs(this.light - 55) / 70;
-    if (!this.sterile && this.day >= 2) this.contam = true;
-    const g = this.contam ? -1.1 : Math.max(0, ts * ls * (this.nut / 100)) * 6.5;
-    this.bio = Math.max(0, Math.min(100, this.bio + g));
-    NB.add("plant", `Day ${this.day} · biomass ${Math.round(this.bio)}%${this.contam ? " · contamination" : ""}`);
-    if (this.bio >= 78 && this.sterile) markDone("plant");
   },
   tick() {
     const L = this.layout();
