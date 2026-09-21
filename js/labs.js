@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js?v=40";
+import { markSim } from "./ui.js?v=41";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js?v=40";
+} from "./core.js?v=41";
 
 const sim = $("#sim");
 let scene = "intro";
@@ -2717,6 +2717,22 @@ const Plant = {
     glass.addColorStop(0.45, "rgba(40,70,55,0.28)");
     glass.addColorStop(1, "rgba(12,24,18,0.5)");
     ctx.fillStyle = glass; ctx.fill();
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(dx - 58, dy + 62);
+    ctx.quadraticCurveTo(dx - 70, dy + 6, dx - 24, dy - 48);
+    ctx.lineTo(dx - 16, dy - 100);
+    ctx.lineTo(dx + 16, dy - 100);
+    ctx.lineTo(dx + 24, dy - 48);
+    ctx.quadraticCurveTo(dx + 70, dy + 6, dx + 58, dy + 62);
+    ctx.closePath();
+    ctx.clip();
+    const cavity = ctx.createRadialGradient(dx - 10, dy - 20, 8, dx, dy + 10, 90);
+    cavity.addColorStop(0, "rgba(36,64,48,0.55)");
+    cavity.addColorStop(1, "rgba(8,18,14,0.35)");
+    ctx.fillStyle = cavity;
+    ctx.fillRect(dx - 80, dy - 130, 160, 220);
+    ctx.restore();
     ctx.strokeStyle = "rgba(210,230,220,0.45)"; ctx.lineWidth = 3; ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(dx - 22, dy - 108); ctx.lineTo(dx + 22, dy - 108);
@@ -2746,34 +2762,65 @@ const Plant = {
   },
   drawCulture(ctx, dx, dy) {
     const g = this.bio / 100;
-    const pale = this.light < 22 ? 0.45 : 1;
-    if (g < 0.2) {
-      this.drawExplant(ctx, dx, dy + 10, 0.85);
+    const pale = this.light < 22 ? 0.55 : 1;
+    const shootV = Math.max(this.shoots, Math.max(0, (g - 0.18) / 0.5));
+    const rootV = Math.max(this.roots, Math.max(0, (g - 0.24) / 0.55) * (this.aux / 90));
+    if (g < 0.16) {
+      this.drawExplant(ctx, dx, dy + 8, 1);
       return;
     }
-    ctx.fillStyle = `rgba(196,176,112,${0.55 + g * 0.3})`;
-    ctx.beginPath(); ctx.ellipse(dx, dy + 16, 12 + g * 28, 7 + g * 16, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(232,220,160,0.35)";
-    ctx.beginPath(); ctx.ellipse(dx - 4, dy + 8, 8 + g * 10, 5, 0, 0, Math.PI * 2); ctx.fill();
-    if (this.shoots > 0.2) {
-      const n = this.shoots > 0.7 ? 4 : this.shoots > 0.4 ? 3 : 2;
-      for (let i = 0; i < n; i++) {
-        const ox = (i - (n - 1) / 2) * 14;
-        ctx.save(); ctx.globalAlpha = pale;
-        shrub(ctx, dx + ox, dy + 10, 0.18 + this.shoots * 0.22, t + i, false, true);
-        ctx.restore();
-      }
-    }
-    if (this.roots > 0.25) {
-      ctx.strokeStyle = `rgba(180,140,80,${0.35 + this.roots * 0.4})`;
-      ctx.lineWidth = 1.4;
-      for (let i = 0; i < 5; i++) {
+    ctx.fillStyle = `rgba(210,186,110,${0.7 + g * 0.25})`;
+    ctx.beginPath(); ctx.ellipse(dx, dy + 18, 16 + g * 26, 9 + g * 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,236,170,0.45)";
+    ctx.beginPath(); ctx.ellipse(dx - 6, dy + 10, 10 + g * 10, 6, 0, 0, Math.PI * 2); ctx.fill();
+    if (rootV > 0.12) {
+      ctx.strokeStyle = `rgba(210,160,90,${0.45 + rootV * 0.45})`;
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      for (let i = 0; i < 6; i++) {
         ctx.beginPath();
-        ctx.moveTo(dx - 10 + i * 5, dy + 28);
-        ctx.quadraticCurveTo(dx - 16 + i * 8, dy + 40 + this.roots * 10, dx - 8 + i * 4, dy + 48);
+        ctx.moveTo(dx - 12 + i * 5, dy + 26);
+        ctx.quadraticCurveTo(dx - 18 + i * 8, dy + 38 + rootV * 12, dx - 10 + i * 5, dy + 50);
         ctx.stroke();
       }
     }
+    if (shootV > 0.04) {
+      const n = shootV > 0.72 ? 4 : shootV > 0.42 ? 3 : shootV > 0.18 ? 2 : 1;
+      const sc = 0.72 + shootV * 0.55 + g * 0.2;
+      for (let i = 0; i < n; i++) {
+        const ox = (i - (n - 1) / 2) * (18 + shootV * 6);
+        this.drawPlantlet(ctx, dx + ox, dy + 14, sc * (0.92 + (i % 3) * 0.06), pale, t + i);
+      }
+    }
+    if (g >= 0.62 || this.stage() === "plantlets") {
+      ctx.fillStyle = "rgba(180,255,200,0.9)";
+      ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText("plantlets", dx, dy - 72);
+      ctx.textAlign = "start";
+    }
+  },
+  drawPlantlet(ctx, x, y, s, pale, time) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.globalAlpha = pale;
+    const sway = Math.sin(time * 1.4) * 0.08;
+    ctx.rotate(sway * 0.15);
+    ctx.strokeStyle = "#8ee08a";
+    ctx.lineWidth = 3.4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 4);
+    ctx.quadraticCurveTo(-8 + sway * 6, -28, 2, -58);
+    ctx.stroke();
+    ctx.strokeStyle = "#6bc46a";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(-16, -32); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(1, -30); ctx.lineTo(15, -42); ctx.stroke();
+    leaf(ctx, -2, -22, -0.85 + sway * 0.2, 22, 9, "#b6ff9a", sway);
+    leaf(ctx, 3, -34, 0.7 + sway * 0.15, 20, 8, "#8ee08a", -sway);
+    leaf(ctx, 1, -50, -0.2, 16, 7, "#d4ffb8", sway * 0.5);
+    ctx.restore();
   },
   drawExplant(ctx, x, y, s) {
     ctx.save();
