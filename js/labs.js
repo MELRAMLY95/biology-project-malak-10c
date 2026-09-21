@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js?v=38";
+import { markSim } from "./ui.js?v=39";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js?v=38";
+} from "./core.js?v=39";
 
 const sim = $("#sim");
 let scene = "intro";
@@ -60,7 +60,7 @@ function hudFor(id) {
     quiz: ["Quiz", "Check your understanding", "Choose A–D, then submit."],
     exam: ["Exam pad", "Use mark-scheme language", "Nuclear DNA · mitosis · enucleated egg · surrogate."],
     glossary: ["Glossary", "Terms from the specification", "Select a word for a short definition."],
-    scnt: ["SCNT laboratory", "Micromanipulation · 5.19B", "Aspirate somatic nucleus → enucleate egg → transfer → pulse (mitosis, not new DNA) → implant."],
+    scnt: ["SCNT laboratory", "Micromanipulation · 5.19B", "Aspirate somatic nucleus → enucleate egg → transfer → pulse starts the cell cycle → S-phase copies donor DNA → mitosis → blastocyst → surrogate."],
     dolly: ["Roslin 1996", "Repeat Dolly’s protocol", "G0 mammary nucleus from Finn-Dorset. Enucleated Blackface egg. Pulse starts mitosis. Match the barcode."],
     plant: ["Tissue culture", "Produce identical plants", "Explant → sterilise → culture → plantlets → greenhouse."],
     bacteria: ["Bacterial world", "A clonal population from one cell", "Binary fission: replicate DNA → elongate → septum → two clones. Temperature and nutrients set the rate."],
@@ -97,7 +97,7 @@ function dockFor(id) {
         <button type="button" data-spd="3">Fast</button>
       </div>
       <button type="button" id="implant" disabled>Transfer to surrogate</button>
-      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Grab the glass pipette, or click a nucleus to aim. Alignment ring turns green when you may release. After blastocyst, click the embryo to implant.</p>`;
+      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Green ring = aligned. After the pulse: egg cytoplasm reprogrammes the donor nucleus → S-phase copies that DNA → prophase → metaphase → anaphase → telophase → cytokinesis. Repeat to blastocyst. Mitochondria stay with the egg.</p>`;
     bindScntDock();
   } else if (id === "plant") {
     d.innerHTML = `
@@ -160,7 +160,7 @@ function dockFor(id) {
 
 export function hint() {
   const h = {
-    scnt: "Grab the glass pipette or click a nucleus to aim. Green ring = aligned — release to aspirate. Enucleate the egg before you seat the donor. Hold activate. Implant at blastocyst.",
+    scnt: "Grab the pipette or click a nucleus. Enucleate the egg, seat the donor, hold activate. Watch S-phase then mitosis — the pulse does not add DNA. Implant at blastocyst.",
     dolly: "Click Finn-Dorset → serum-starve the mammary cell (G0) → Blackface egg → discard egg nucleus → seat donor nucleus → electrodes → pulse (mitosis, not new DNA) → wait for cleavage → implant → match the barcode.",
     plant: "Click the parent shoot to cut. Sterilise. Drag the explant into the flask — unsterilised tissue contaminates the culture.",
     bacteria: "Click the cell under the microscope to start fission. Cold or starvation slows it. Drag the temperature above ~48°C and proteins denature — Reset.",
@@ -173,7 +173,7 @@ export function hint() {
 
 export function procedure() {
   const p = {
-    scnt: "1 Somatic nucleus  2 Enucleate egg  3 Transfer  4 Activate  5 Implant in surrogate",
+    scnt: "1 Somatic nucleus  2 Enucleate egg  3 Transfer  4 Pulse (starts cycle, no new DNA)  5 S-phase → mitosis → blastocyst  6 Surrogate",
     dolly: "Finn-Dorset mammary (G0) → enucleated Blackface egg → pulse / mitosis → Blackface surrogate. Nuclear DNA = donor.",
     plant: "Explant → surface sterilise → nutrient medium → plantlets → acclimatise",
     bacteria: "DNA replicates → cell elongates → septum → two clones",
@@ -1020,6 +1020,7 @@ function bindDefDock() {
 }
 
 /* ---------- SCNT ---------- */
+const SCNT_SEQ = [0, 1, 2, 0, 1, 2, 3, 1];
 const SCNT = {
   state: "idle",
   zoom: 1, focus: 0.82, ox: 0, oy: 0, draggingSample: false,
@@ -1029,7 +1030,7 @@ const SCNT = {
   nucE: { out: false, anim: 0 },
   mistakes: 0, div: 0, play: 0, pulse: 0, implanted: false, _hud: "",
   reset(log) {
-    Object.assign(this, { state: "idle", ox: 0, oy: 0, zoom: 1, focus: 0.82, pip: { x: innerWidth * 0.48, y: 90, tx: innerWidth * 0.48, ty: 90, load: null }, egg: { r: 118, enuc: false }, nucD: { out: false, inEgg: false, anim: 0 }, nucE: { out: false, anim: 0 }, mistakes: 0, div: 0, play: 0, pulse: 0, implanted: false, settle: 0, grab: false, draggingSample: false, hover: null, _hud: "", autoAim: false });
+    Object.assign(this, { state: "idle", ox: 0, oy: 0, zoom: 1, focus: 0.82, pip: { x: innerWidth * 0.48, y: 90, tx: innerWidth * 0.48, ty: 90, load: null }, egg: { r: 118, enuc: false }, nucD: { out: false, inEgg: false, anim: 0 }, nucE: { out: false, anim: 0 }, mistakes: 0, div: 0, play: 0, pulse: 0, implanted: false, settle: 0, grab: false, draggingSample: false, hover: null, _hud: "", autoAim: false, pb: null, lastGen: 0 });
     const z = $("#scntZoom"); if (z) z.value = 1;
     const f = $("#scntFocus"); if (f) f.value = "0.82";
     const p = $("#pulse"); if (p) { p.disabled = true; const i = p.querySelector("i"); if (i) i.style.width = "0"; }
@@ -1038,14 +1039,60 @@ const SCNT = {
   },
   steps() {
     return {
-      idle: "1 / 5  ·  Aim at the somatic nucleus. Green ring, then release.",
-      egg: "2 / 5  ·  Enucleate the egg. Two genomes cannot share one oocyte.",
-      transfer: "3 / 5  ·  Seat the donor nucleus in the empty cytoplasm.",
-      seating: "Donor nucleus travelling through cytoplasm…",
-      activate: "4 / 5  ·  Hold activate. Pulse starts mitosis — it does not add DNA.",
-      dividing: "5 / 5  ·  Mitosis. Implant at morula / blastocyst.",
-      compare: "Nuclear DNA = somatic donor. Surrogate is not the nuclear parent."
+      idle: "1 / 6  ·  Aim at the somatic nucleus. Green ring, then release.",
+      egg: "2 / 6  ·  Enucleate the egg. Two genomes cannot share one oocyte.",
+      transfer: "3 / 6  ·  Seat the donor nucleus in the empty cytoplasm.",
+      seating: "Donor nucleus travelling through cytoplasm. Mitochondria stay in the egg.",
+      activate: "4 / 6  ·  Hold activate. The pulse starts the cell cycle — it does not add DNA.",
+      dividing: "5 / 6  ·  Watch mitosis. Implant at blastocyst.",
+      compare: "6 / 6  ·  Nuclear DNA = somatic donor. Egg mitochondria. Surrogate is not the nuclear parent."
     };
+  },
+  hudLine() {
+    if (this.state !== "dividing" && this.state !== "compare") return this.steps()[this.state];
+    if (this.state === "compare") return this.steps().compare;
+    const gen = Math.min(5, Math.floor(this.div));
+    const names = ["1-cell oocyte", "2-cell", "4-cell", "8-cell", "morula", "blastocyst"];
+    return names[gen] + "  ·  " + this.cleavePhase() + " — donor nuclear DNA is copied, not rewritten.";
+  },
+  ease(u) { const x = Math.max(0, Math.min(1, u)); return x * x * (3 - 2 * x); },
+  mix(a, b, u) { return a + (b - a) * this.ease(Math.max(0, Math.min(1, u))); },
+  frac() { return this.div - Math.floor(this.div); },
+  cleavePhase() {
+    const gen = Math.min(5, Math.floor(this.div));
+    const u = this.frac();
+    if (gen >= 5) return "blastocyst (inner cell mass + trophectoderm)";
+    if (gen === 0) {
+      if (u < 0.12) return "reprogramming (egg cytoplasm, donor nucleus)";
+      if (u < 0.26) return "S-phase (chromatids duplicating)";
+      if (u < 0.40) return "prophase (envelope breaks, chromosomes condense)";
+      if (u < 0.54) return "metaphase (equator / spindle)";
+      if (u < 0.70) return "anaphase (sister chromatids to poles)";
+      if (u < 0.84) return "telophase (nuclei reform)";
+      return "cytokinesis (cleavage furrow)";
+    }
+    if (u < 0.16) return "S-phase in blastomeres";
+    if (u < 0.32) return "prophase";
+    if (u < 0.48) return "metaphase";
+    if (u < 0.66) return "anaphase";
+    if (u < 0.82) return "telophase";
+    return "cytokinesis";
+  },
+  mitoU() {
+    const gen = Math.floor(this.div);
+    const u = this.frac();
+    if (gen === 0) {
+      if (u < 0.26) return 0;
+      return Math.min(1, (u - 0.26) / 0.74);
+    }
+    if (u < 0.16) return 0;
+    return Math.min(1, (u - 0.16) / 0.84);
+  },
+  sProg() {
+    const gen = Math.floor(this.div);
+    const u = this.frac();
+    if (gen === 0) return u < 0.12 ? 0 : Math.min(1, (u - 0.12) / 0.14);
+    return Math.min(1, u / 0.16);
   },
   donorPos() { return { x: innerWidth * 0.34 + this.ox, y: innerHeight * 0.52 + this.oy }; },
   eggPos() { return { x: innerWidth * 0.66 + this.ox, y: innerHeight * 0.52 + this.oy }; },
@@ -1073,7 +1120,16 @@ const SCNT = {
       toast("Ready to activate. The genome is already the donor’s.", "");
     }
     if (this.play && this.state === "dividing") {
-      this.div = Math.min(5.2, this.div + 0.0032 * this.play);
+      const gen = Math.floor(this.div);
+      const spd = gen === 0 ? 0.00155 : gen < 3 ? 0.0024 : 0.0031;
+      this.div = Math.min(5.2, this.div + spd * this.play);
+      if (Math.floor(this.div) > this.lastGen && this.lastGen < 5) {
+        this.lastGen = Math.floor(this.div);
+        audio.pop();
+        const names = ["", "2 cells — identical donor nuclei", "4 cells", "8 cells", "morula compacting", "blastocyst"];
+        toast(names[this.lastGen] || "Cleavage", "");
+        NB.add("scnt", names[this.lastGen] + ". Every nucleus still matches the somatic donor.");
+      }
       const imp = $("#implant");
       if (imp) imp.disabled = this.div < 4.2 || this.implanted;
     }
@@ -1083,12 +1139,13 @@ const SCNT = {
       else if (this.state === "transfer" && this.pip.load === "d" && dist(this.tip(), this.eggPos()) < this.egg.r - 4) { this.autoAim = false; this.insert(); }
     }
     this.draw();
-    if (this._hud !== this.state) {
-      this._hud = this.state;
+    const msg = this.hudLine();
+    if (this._hud !== msg) {
+      this._hud = msg;
       const el = $("#scntStep");
-      if (el) el.textContent = this.steps()[this.state];
+      if (el) el.textContent = msg;
     }
-    status(this.steps()[this.state] || this.state, acc(this.mistakes));
+    status(msg, acc(this.mistakes));
   },
   draw() {
     const w = innerWidth, h = innerHeight;
@@ -1103,16 +1160,20 @@ const SCNT = {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
     drawDust(ctx, w, h, t, 56);
+    const lookZ = this.zoom * ((this.state === "dividing" && this.div < 1.05) ? 1.22 : 1);
     ctx.translate(cx, cy);
-    ctx.scale(this.zoom, this.zoom);
+    ctx.scale(lookZ, lookZ);
     ctx.translate(-cx, -cy);
-    ctx.filter = `blur(${(1 - this.focus) * 2.4}px)`;
+    const blur = (1 - this.focus) * 2.4;
+    if (blur > 0.35) ctx.filter = `blur(${blur}px)`;
 
     if (this.state === "dividing" || this.state === "compare") this.drawDiv(ctx, w, h);
     else this.drawField(ctx);
     ctx.filter = "none";
-    this.drawHoldPip(ctx);
-    this.drawPip(ctx);
+    if (this.state !== "dividing" && this.state !== "compare") {
+      this.drawHoldPip(ctx);
+      this.drawPip(ctx);
+    }
     ctx.restore();
 
     ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2);
@@ -1135,27 +1196,68 @@ const SCNT = {
     ctx.fillText("10 µm", cx + rad - 65, cy + 22);
     ctx.fillStyle = "rgba(212,180,138,0.7)";
     ctx.font = "11px IBM Plex Mono";
-    ctx.fillText("OPTICAL FIELD  ·  OIL  100×  ·  " + this.state.toUpperCase(), cx, cy + rad + 32);
+    ctx.fillText("OPTICAL FIELD  ·  OIL  100×  ·  " + (this.state === "dividing" ? this.cleavePhase().split(" (")[0].toUpperCase() : this.state.toUpperCase()), cx, cy + rad + 32);
     ctx.textAlign = "start";
   },
   drawField(ctx) {
     const d = this.donorPos(), e = this.eggPos();
     const dHot = this.hover === "d" || this.aligned("d");
     const eHot = this.hover === "e" || (this.state === "transfer" && dist(this.tip(), e) < this.egg.r);
+    this.drawZona(ctx, e.x, e.y, this.egg.r + 16, 1);
+    this.drawEggMito(ctx, e.x, e.y, this.egg.r);
     this.aimRing(ctx, this.nucAt("d"), this.state === "idle" && dHot);
     this.aimRing(ctx, this.nucAt("e"), this.state === "egg" && eHot);
     drawCell(ctx, { x: d.x, y: d.y, r: this.donor.r, t, kind: "soma", showNuc: !this.nucD.out, deform: this.nucD.anim, hot: dHot });
     drawCell(ctx, { x: e.x, y: e.y, r: this.egg.r, t, kind: "egg", showNuc: !this.nucE.out, deform: this.nucE.anim, pulse: this.pulse, hot: eHot });
+    if (this.pb) this.drawPolarBody(ctx, this.pb.x, this.pb.y);
     ctx.fillStyle = "rgba(180,220,200,0.55)"; ctx.font = "12px IBM Plex Sans"; ctx.textAlign = "center";
     ctx.fillText("somatic cell  ·  diploid nucleus", d.x, d.y + this.donor.r + 22);
-    ctx.fillText(this.egg.enuc ? "enucleated egg  ·  cytoplasm kept" : "unfertilised egg  ·  haploid nucleus", e.x, e.y + this.egg.r + 22);
+    ctx.fillText(this.egg.enuc ? "enucleated egg  ·  cytoplasm + mitochondria kept" : "unfertilised egg  ·  haploid nucleus + zona", e.x, e.y + this.egg.r + 26);
     ctx.textAlign = "start";
     if (this.nucD.inEgg || this.settle > 0) {
       const tip = this.tip();
       const u = this.settle || 1;
       const nx = lerp(tip.x, e.x - 4, u), ny = lerp(tip.y, e.y - 4, u);
-      this.chromatin(ctx, nx, ny, 15, "donor");
+      this.chromatin(ctx, nx, ny, 15 + (this.state === "activate" ? 4 : 0), "donor");
     }
+    if (this.state === "activate") {
+      ctx.fillStyle = "rgba(224,180,120,0.85)";
+      ctx.font = "13px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText("Reconstructed oocyte  ·  donor nuclear DNA in egg cytoplasm", (d.x + e.x) / 2, e.y - this.egg.r - 28);
+      ctx.textAlign = "start";
+    }
+  },
+  drawZona(ctx, x, y, r, a) {
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,214,168,0.22)"; ctx.lineWidth = 12; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,230,190,0.35)"; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.restore();
+  },
+  drawEggMito(ctx, x, y, r) {
+    for (let i = 0; i < 16; i++) {
+      const a = i * 2.15 + t * 0.18;
+      const rr = r * (0.28 + (i % 6) * 0.08);
+      const mx = x + Math.cos(a) * rr, my = y + Math.sin(a * 1.07) * rr * 0.82;
+      ctx.save();
+      ctx.translate(mx, my); ctx.rotate(a);
+      ctx.fillStyle = "rgba(210,120,70,0.72)";
+      ctx.beginPath(); ctx.ellipse(0, 0, 6.5, 3.1, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(255,200,140,0.4)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-3.5, 0); ctx.quadraticCurveTo(0, 1.8, 3.5, 0); ctx.stroke();
+      ctx.restore();
+    }
+  },
+  drawPolarBody(ctx, x, y) {
+    ctx.fillStyle = "rgba(160,140,220,0.55)";
+    ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,220,255,0.35)"; ctx.stroke();
+    ctx.fillStyle = "rgba(200,190,230,0.7)";
+    ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("discarded egg nucleus", x, y - 16);
+    ctx.textAlign = "start";
   },
   aimRing(ctx, n, on) {
     if (!on) return;
@@ -1218,47 +1320,211 @@ const SCNT = {
     this.autoAim = true;
   },
   drawDiv(ctx, w, h) {
-    const stage = Math.min(5, Math.floor(this.div));
-    const n = [1, 2, 4, 8, 16, 24][stage];
-    const names = ["1 cell", "2 cells", "4 cells", "8 cells", "morula", "blastocyst"];
-    const cx = w / 2, cy = h / 2 + 10;
-    ctx.fillStyle = "#d4b48a"; ctx.font = "17px IBM Plex Sans"; ctx.textAlign = "center";
-    ctx.fillText(names[stage] + "  —  mitosis copies donor nuclear DNA", cx, cy - 118);
+    const gen = Math.min(5, Math.floor(this.div));
+    const u = this.frac();
+    const names = ["reconstructed oocyte (1-cell)", "2-cell embryo", "4-cell embryo", "8-cell embryo", "morula", "blastocyst"];
+    const cx = w / 2, cy = h / 2 + 8;
+    ctx.fillStyle = "#d4b48a"; ctx.font = "16px IBM Plex Sans"; ctx.textAlign = "center";
+    ctx.fillText(names[gen], cx, cy - 168);
     ctx.font = "12px IBM Plex Mono";
-    ctx.fillText(this.state === "compare" ? "Clone nuclear DNA = somatic donor  ·  not the surrogate" : "Wait for blastocyst, then click the embryo to implant", cx, cy - 96);
+    ctx.fillStyle = "rgba(200,220,210,0.85)";
+    ctx.fillText(this.cleavePhase(), cx, cy - 146);
+    ctx.font = "11px IBM Plex Sans";
+    ctx.fillStyle = "rgba(224,180,120,0.88)";
+    ctx.fillText(this.state === "compare" ? "Clone nuclear DNA = somatic donor  ·  mitochondria usually from the egg  ·  not the surrogate" : "The pulse started this cycle. It did not write genes. Wait for blastocyst to implant.", cx, cy - 126);
     ctx.textAlign = "start";
-    const zona = 42 + Math.min(82, n * 3.4);
-    ctx.beginPath(); ctx.arc(cx, cy, zona + 6, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,210,160,0.16)"; ctx.lineWidth = 16; ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, zona, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,220,170,0.42)"; ctx.lineWidth = 4; ctx.stroke();
-    if (stage >= 5) {
-      ctx.beginPath(); ctx.arc(cx + 16, cy - 10, zona * 0.36, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(20,40,36,0.45)"; ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = "rgba(212,180,138,0.8)"; ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
-      ctx.fillText("blastocoel", cx + 16, cy - 10);
-      ctx.fillText("inner cell mass", cx - zona * 0.35, cy + 8);
-      ctx.fillText("trophectoderm", cx, cy + zona - 18);
-      ctx.textAlign = "start";
-    }
-    const furrow = this.div - Math.floor(this.div);
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + t * 0.05;
-      const rad = n === 1 ? 0 : 26 + Math.min(72, n * 3);
-      const r = n === 1 ? 62 : Math.max(10, 32 - n * 0.65);
-      const pulse = n === 2 && furrow > 0.55 ? 1 + Math.sin(t * 8) * 0.04 : 1;
-      drawCell(ctx, {
-        x: cx + Math.cos(a) * rad, y: cy + Math.sin(a) * rad,
-        r: r * pulse,
-        t, kind: "soma", showNuc: true, hot: this.state === "compare" || (stage >= 5 && this.div >= 4.2)
-      });
-    }
+
+    const zona = gen === 0 ? 108 : 48 + Math.min(86, [0, 2, 4, 8, 16, 24][gen] * 3.2);
+    this.drawZona(ctx, cx, cy, zona, 0.95);
+    this.drawEggMito(ctx, cx, cy, zona * 0.72);
+
+    if (gen === 0) this.drawFirstCleavage(ctx, cx, cy, 78, u);
+    else this.drawBlastomeres(ctx, cx, cy, gen, u, zona);
+
+    this.drawSeq(ctx, cx, cy + zona + 36, SCNT_SEQ, "donor nuclear barcode  ·  every blastomere");
+
     const frac = Math.min(1, this.div / 5.2);
     ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.fillRect(cx - 90, cy + zona + 22, 180, 5);
+    ctx.fillRect(cx - 100, cy + zona + 58, 200, 5);
     ctx.fillStyle = "#d4b48a";
-    ctx.fillRect(cx - 90, cy + zona + 22, 180 * frac, 5);
+    ctx.fillRect(cx - 100, cy + zona + 58, 200 * frac, 5);
+    ctx.fillStyle = "rgba(200,210,200,0.55)";
+    ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("cell cycle  →  blastocyst", cx, cy + zona + 76);
+    ctx.textAlign = "start";
+
+    if (this.state === "compare") this.drawSurrogateNote(ctx, cx, cy + zona + 100);
+  },
+  drawFirstCleavage(ctx, cx, cy, r, u) {
+    const mu = this.mitoU();
+    const furrow = u > 0.84 ? this.ease((u - 0.84) / 0.16) : 0;
+    const rx = r * (1 + this.pulse * 0.08);
+    drawCell(ctx, {
+      x: cx, y: cy, r: rx,
+      t, kind: "egg", showNuc: false, pulse: this.pulse,
+      deform: furrow
+    });
+    if (furrow > 0.08) {
+      ctx.strokeStyle = `rgba(255,230,200,${0.25 + furrow * 0.5})`;
+      ctx.lineWidth = 1.5 + furrow * 6;
+      ctx.beginPath(); ctx.moveTo(cx - r * 1.05, cy); ctx.lineTo(cx + r * 1.05, cy); ctx.stroke();
+    }
+    if (u < 0.12) {
+      const swell = 16 + u / 0.12 * 8;
+      this.chromatin(ctx, cx - 4, cy - 4, swell, "donor");
+      ctx.fillStyle = "rgba(142,224,184,0.75)";
+      ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText("nucleus swelling  ·  reprogramming", cx, cy + r + 18);
+      ctx.textAlign = "start";
+    } else if (u < 0.26) {
+      this.drawSphase(ctx, cx, cy, this.sProg());
+    } else {
+      this.drawSpindle(ctx, cx, cy, r, mu);
+    }
+    if (this.pb) this.drawPolarBody(ctx, cx + r + 28, cy - r * 0.7);
+  },
+  drawBlastomeres(ctx, cx, cy, gen, u, zona) {
+    const n = [1, 2, 4, 8, 16, 22][gen];
+    const mu = this.mitoU();
+    const sPhase = (gen === 0 ? u < 0.26 : u < 0.16);
+    const dividing = !sPhase && gen < 5;
+    if (gen >= 5) {
+      ctx.beginPath(); ctx.arc(cx + 18, cy - 12, zona * 0.38, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(20,40,36,0.5)"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "rgba(212,180,138,0.85)"; ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+      ctx.fillText("blastocoel", cx + 18, cy - 12);
+      ctx.fillText("inner cell mass", cx - zona * 0.38, cy + 10);
+      ctx.fillText("trophectoderm", cx, cy + zona - 20);
+      ctx.textAlign = "start";
+    }
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + t * 0.04;
+      const rad = n <= 2 ? (n === 1 ? 0 : 34) : 28 + Math.min(70, n * 2.8);
+      const br = n === 1 ? 58 : Math.max(11, 30 - n * 0.55);
+      const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+      const showNuc = sPhase || mu < 0.08 || mu > 0.78 || gen >= 5;
+      drawCell(ctx, {
+        x, y, r: br,
+        t, kind: "soma",
+        showNuc,
+        hot: this.state === "compare" || (gen >= 5 && this.div >= 4.2)
+      });
+      if (sPhase && gen < 5) this.drawSphase(ctx, x, y, this.sProg());
+      else if (dividing && i < Math.min(n, 4) && mu > 0.02 && mu < 0.92) this.drawSpindle(ctx, x, y, br, mu);
+    }
+  },
+  drawSphase(ctx, x, y, prog) {
+    this.chromatin(ctx, x, y, 14 + prog * 3, "donor");
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = `rgba(232,188,96,${0.35 + prog * 0.5})`;
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.1;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * 7, Math.sin(a) * 5, 5 + prog * 3, 2, a, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * 7 + 6 * prog, Math.sin(a) * 5, 4, 1.7, a, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(232,210,140,0.8)";
+    ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("S-phase", 0, 28);
+    ctx.textAlign = "start";
+    ctx.restore();
+  },
+  drawSpindle(ctx, x, y, r, u) {
+    ctx.save();
+    ctx.translate(x, y);
+    const envA = u < 0.16 ? 1 - this.ease(u / 0.16) : u > 0.72 ? this.ease((u - 0.72) / 0.16) : 0;
+    if (envA > 0.05) {
+      ctx.globalAlpha = envA;
+      ctx.strokeStyle = "rgba(180,230,200,0.6)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 0, 18, 14, 0.1, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    const n = 6;
+    const poleY = this.mix(7, r * 0.48, Math.min(1, u / 0.3));
+    if (u > 0.1 && u < 0.74) {
+      ctx.fillStyle = "rgba(200,220,255,0.55)";
+      ctx.beginPath(); ctx.arc(0, -poleY, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, poleY, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(200,220,255,${0.14 + (0.5 - Math.abs(u - 0.42))})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < n; i++) {
+        const p = this.chrPair(i, n, u);
+        ctx.beginPath(); ctx.moveTo(0, -poleY); ctx.lineTo(p.x, p.y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, poleY); ctx.lineTo(p.x, p.y2); ctx.stroke();
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const p = this.chrPair(i, n, u);
+      this.drawChromatid(ctx, p.x, p.y1, 0.82, false);
+      this.drawChromatid(ctx, p.x, p.y2, 0.82, true);
+    }
+    if (u > 0.22 && u < 0.5) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.14 + (0.36 - Math.abs(u - 0.32)) * 0.8})`;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(-r * 0.55, 0); ctx.lineTo(r * 0.55, 0); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  },
+  chrPair(i, n, u) {
+    const base = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const plateX = (i - (n - 1) / 2) * 10;
+    const proX = Math.cos(base) * 11, proY = Math.sin(base) * 8;
+    const split = this.ease(Math.max(0, (u - 0.36) / 0.26));
+    const toPole = this.ease(Math.max(0, (u - 0.54) / 0.22));
+    const x = this.mix(this.mix(proX, plateX, Math.min(1, u / 0.32)), plateX * (1 - toPole * 0.28), split);
+    const y0 = this.mix(proY, Math.sin(t * 1.3 + i) * 1.2, Math.min(1, u / 0.32));
+    const pole = 20 + toPole * 14;
+    return { x, y1: y0 - split * pole, y2: y0 + 4 * (1 - split) + split * pole };
+  },
+  drawChromatid(ctx, x, y, s, twin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.strokeStyle = twin ? "rgba(232,188,96,0.95)" : "rgba(126,230,184,0.95)";
+    ctx.lineWidth = 2.2; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-6, -7); ctx.quadraticCurveTo(-1, 0, -6, 7);
+    ctx.moveTo(6, -7); ctx.quadraticCurveTo(1, 0, 6, 7);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath(); ctx.arc(0, 0, 2.1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+  drawSeq(ctx, x, y, seq, label) {
+    const bw = seq.length * 10;
+    let px = x - bw / 2;
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(px - 5, y - 3, bw + 10, 18);
+    for (let i = 0; i < seq.length; i++) {
+      ctx.fillStyle = BASES[seq[i]];
+      ctx.fillRect(px, y, 8, 12);
+      px += 10;
+    }
+    ctx.fillStyle = "rgba(200,210,200,0.7)";
+    ctx.font = "11px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText(label, x, y + 28);
+    ctx.textAlign = "start";
+  },
+  drawSurrogateNote(ctx, x, y) {
+    ctx.fillStyle = "rgba(8,12,10,0.45)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - 170, y - 18, 340, 52, 10); else ctx.rect(x - 170, y - 18, 340, 52);
+    ctx.fill();
+    ctx.fillStyle = "rgba(232,239,230,0.85)";
+    ctx.font = "12px IBM Plex Sans"; ctx.textAlign = "center";
+    ctx.fillText("Transferred to surrogate uterus", x, y + 4);
+    ctx.fillStyle = "rgba(224,180,120,0.8)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.fillText("uterus only  ·  no nuclear genes donated", x, y + 22);
+    ctx.textAlign = "start";
   },
   down(p) {
     if (inspect) return this.inspectAt(p);
@@ -1318,7 +1584,9 @@ const SCNT = {
   },
   extractE() {
     this.nucE.out = true; this.nucE.anim = 1; this.egg.enuc = true; this.state = "transfer";
-    audio.wet(); NB.add("scnt", "Egg enucleated. Cytoplasm retained.");
+    const e = this.eggPos();
+    this.pb = { x: e.x + this.egg.r * 0.62, y: e.y - this.egg.r * 0.82 };
+    audio.wet(); NB.add("scnt", "Egg enucleated. Cytoplasm and mitochondria retained.");
     toast("Egg enucleated. Seat the donor nucleus next.", "");
   },
   insert() {
@@ -1332,27 +1600,34 @@ const SCNT = {
       audio.bad();
       return;
     }
-    this.pulse = 1; this.state = "dividing"; this.play = 1; this.div = 0;
-    audio.pulse(); NB.add("scnt", "Pulse applied. Mitosis begins — DNA was not added.");
-    toast("Mitosis started. Use Play / Fast, then implant at blastocyst.", "");
+    this.pulse = 1; this.state = "dividing"; this.play = 1; this.div = 0; this.lastGen = 0;
+    audio.pulse(); NB.add("scnt", "Pulse applied. Cell cycle starts — DNA was not added.");
+    toast("Reprogramming, then S-phase copies the donor nucleus. Use Slow to watch PMAT.", "");
   },
   implant() {
     if (this.div < 4.2) return this.fail("Wait until morula / blastocyst.");
     this.implanted = true; this.state = "compare"; markDone("scnt"); markSim("scnt");
     audio.chime();
-    NB.add("scnt", "Embryo in surrogate. Nuclear DNA = somatic donor.");
-    toast("Clone produced. Nuclear DNA matches the body-cell donor.", "");
+    NB.add("scnt", "Embryo in surrogate. Nuclear DNA = somatic donor. Mitochondria usually from the egg.");
+    toast("Clone produced. Nuclear DNA matches the body-cell donor, not the surrogate.", "");
   },
   inspectAt(p) {
     const d = this.donorPos(), e = this.eggPos();
     if (this.state === "dividing" || this.state === "compare") {
-      const stage = Math.min(5, Math.floor(this.div));
-      const names = ["1 cell", "2 cells", "4 cells", "8 cells", "morula", "blastocyst"];
-      callout(names[stage], "Every nucleus matches the somatic donor. Mitosis copies nuclear DNA. The pulse did not write genes.", p.x, p.y);
+      const ph = this.cleavePhase();
+      if (this.div >= 5) callout("Blastocyst", "Inner cell mass can become the fetus. Trophectoderm helps implant. Every nucleus still matches the somatic donor.", p.x, p.y);
+      else if (ph.indexOf("S-phase") >= 0) callout("S-phase", "Existing donor DNA is copied into sister chromatids. The electric pulse did not create this DNA.", p.x, p.y);
+      else if (ph.indexOf("prophase") >= 0) callout("Prophase", "Nuclear envelope breaks down. Chromosomes condense. Still the donor genome.", p.x, p.y);
+      else if (ph.indexOf("metaphase") >= 0) callout("Metaphase", "Chromosomes line up. Spindle fibres from opposite poles attach.", p.x, p.y);
+      else if (ph.indexOf("anaphase") >= 0) callout("Anaphase", "Sister chromatids separate. Each daughter will get the same nuclear DNA.", p.x, p.y);
+      else if (ph.indexOf("telo") >= 0 || ph.indexOf("cyto") >= 0) callout("Telophase / cytokinesis", "Two nuclei reform and the cytoplasm cleaves. Both cells are clones of the donor, not of the egg donor.", p.x, p.y);
+      else if (ph.indexOf("reprogram") >= 0) callout("Reprogramming", "Egg cytoplasm can reset the somatic nucleus so it can direct an embryo. Nuclear DNA sequence is still the donor’s.", p.x, p.y);
+      else callout("Cleavage", "Repeated mitosis. Nuclear DNA = somatic donor. Mitochondria usually remain from the egg.", p.x, p.y);
       return;
     }
-    if (dist(p, d) < this.donor.r) callout("Somatic cell", "Differentiated body cell. Its diploid nucleus is the genome you copy.", p.x, p.y);
-    else if (dist(p, e) < this.egg.r) callout(this.egg.enuc ? "Enucleated egg" : "Unfertilised egg", this.egg.enuc ? "Cytoplasm can reprogramme the donor nucleus. Mitochondria remain from the egg." : "Haploid nucleus must be removed or two genomes mix.", p.x, p.y);
+    if (this.pb && dist(p, this.pb) < 28) callout("Removed egg nucleus", "Taken out so two genomes do not mix. Chromosome number stays diploid from the donor only.", p.x, p.y);
+    else if (dist(p, d) < this.donor.r) callout("Somatic cell", "Differentiated body cell. Its diploid nucleus is the genome you copy.", p.x, p.y);
+    else if (dist(p, e) < this.egg.r + 20) callout(this.egg.enuc ? "Enucleated egg" : "Unfertilised egg", this.egg.enuc ? "Zona and cytoplasm kept. Mitochondria stay with the egg. Cytoplasm can reprogramme the donor nucleus." : "Haploid nucleus must be removed or two genomes mix. Zona pellucida surrounds the oocyte.", p.x, p.y);
     else if (dist(p, this.pip) < 40 || dist(p, this.tip()) < 28) callout("Micropipette", "Drag to aim. Green ring means alignment. Release to aspirate or inject.", p.x, p.y);
     else hideCallout();
   },
