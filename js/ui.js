@@ -1,5 +1,5 @@
-import { $, $$, toast, audio, store, NB } from "./core.js?v=39";
-import { LESSONS, GLOSSARY, ETHICS, DEPTH } from "./content.js?v=39";
+import { $, $$, toast, audio, store, NB } from "./core.js?v=40";
+import { LESSONS, GLOSSARY, ETHICS, DEPTH } from "./content.js?v=40";
 
 const PKEY = "progress";
 export function progress() {

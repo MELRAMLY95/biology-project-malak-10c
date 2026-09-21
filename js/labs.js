@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js?v=39";
+import { markSim } from "./ui.js?v=40";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js?v=39";
+} from "./core.js?v=40";
 
 const sim = $("#sim");
 let scene = "intro";
@@ -62,7 +62,7 @@ function hudFor(id) {
     glossary: ["Glossary", "Terms from the specification", "Select a word for a short definition."],
     scnt: ["SCNT laboratory", "Micromanipulation · 5.19B", "Aspirate somatic nucleus → enucleate egg → transfer → pulse starts the cell cycle → S-phase copies donor DNA → mitosis → blastocyst → surrogate."],
     dolly: ["Roslin 1996", "Repeat Dolly’s protocol", "G0 mammary nucleus from Finn-Dorset. Enucleated Blackface egg. Pulse starts mitosis. Match the barcode."],
-    plant: ["Tissue culture", "Produce identical plants", "Explant → sterilise → culture → plantlets → greenhouse."],
+    plant: ["Tissue culture", "Micropropagation · 5.17B / 5.18B", "Explant from totipotent meristem → surface sterilise → in vitro medium + hormones → callus → plantlets → acclimatise."],
     bacteria: ["Bacterial world", "A clonal population from one cell", "Binary fission: replicate DNA → elongate → septum → two clones. Temperature and nutrients set the rate."],
     transgenic: ["Genetic engineering", "Human insulin in a host", "Select insulin (not a decoy gene). Insert. Clone. Collect the protein."],
     ethics: ["Ethics chamber", "No single mark-scheme ‘yes’", "Take a stance. Harvest both sides. Write like 4BI1."],
@@ -101,13 +101,14 @@ function dockFor(id) {
     bindScntDock();
   } else if (id === "plant") {
     d.innerHTML = `
-      <button type="button" id="pCut">Cut explant</button>
-      <button type="button" id="pSter">Sterilise</button>
-      <button type="button" id="pPlate">Place in medium</button>
+      <p id="pStep" style="color:var(--mute);font-size:12px;line-height:1.45">Find a totipotent meristem on the parent (shoot apex or axillary bud).</p>
       <label>Temperature °C <input id="pTemp" type="range" min="12" max="38" value="24" /></label>
-      <label>Light <input id="pLight" type="range" min="0" max="100" value="55" /></label>
-      <label>Nutrients <input id="pNut" type="range" min="0" max="100" value="70" /></label>
-      <button type="button" id="pXfer">Acclimatise plantlets</button>`;
+      <label>Light <input id="pLight" type="range" min="0" max="100" value="60" /></label>
+      <label>Nutrients <input id="pNut" type="range" min="0" max="100" value="75" /></label>
+      <label>Auxin (roots) <input id="pAux" type="range" min="0" max="100" value="48" /></label>
+      <label>Cytokinin (shoots) <input id="pCyto" type="range" min="0" max="100" value="52" /></label>
+      <button type="button" id="pXfer">Acclimatise plantlets</button>
+      <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Click a glowing meristem. Drag shears to cut. Dunk the explant in sterilant. Drop it on agar. Hormones: cytokinin favours shoots, auxin favours roots — you need both to wean. Drag a plantlet into a greenhouse pot.</p>`;
     bindPlantDock();
   } else if (id === "bacteria") {
     d.innerHTML = `
@@ -162,7 +163,7 @@ export function hint() {
   const h = {
     scnt: "Grab the pipette or click a nucleus. Enucleate the egg, seat the donor, hold activate. Watch S-phase then mitosis — the pulse does not add DNA. Implant at blastocyst.",
     dolly: "Click Finn-Dorset → serum-starve the mammary cell (G0) → Blackface egg → discard egg nucleus → seat donor nucleus → electrodes → pulse (mitosis, not new DNA) → wait for cleavage → implant → match the barcode.",
-    plant: "Click the parent shoot to cut. Sterilise. Drag the explant into the flask — unsterilised tissue contaminates the culture.",
+    plant: "Click a meristem (apex or bud). Drag shears onto it. Dunk the explant fully in sterilant, then onto agar. Balance auxin and cytokinin. Drag plantlets into pots — unsterilised tissue contaminates.",
     bacteria: "Click the cell under the microscope to start fission. Cold or starvation slows it. Drag the temperature above ~48°C and proteins denature — Reset.",
     transgenic: "Click INSULIN (not haemoglobin or keratin). Drag the cassette onto the host. Click the transgenic cell to clone, then collect protein.",
     define: "Click the parent nucleus. Watch S-phase. Drag the sister copy into empty cytoplasm — not a gamete. After mitosis, drag lamp or food onto Clone B, then pick the matching barcode.",
@@ -175,7 +176,7 @@ export function procedure() {
   const p = {
     scnt: "1 Somatic nucleus  2 Enucleate egg  3 Transfer  4 Pulse (starts cycle, no new DNA)  5 S-phase → mitosis → blastocyst  6 Surrogate",
     dolly: "Finn-Dorset mammary (G0) → enucleated Blackface egg → pulse / mitosis → Blackface surrogate. Nuclear DNA = donor.",
-    plant: "Explant → surface sterilise → nutrient medium → plantlets → acclimatise",
+    plant: "1 Meristem explant  2 Surface sterilise  3 Sterile medium + hormones  4 Callus → shoots + roots  5 Acclimatise in greenhouse",
     bacteria: "DNA replicates → cell elongates → septum → two clones",
     transgenic: "Identify human insulin gene → introduce into host genome → clone the host → insulin from the culture",
     ethics: "Name an advantage, a disadvantage, and who pays the cost. Never claim the pulse creates DNA.",
@@ -2435,10 +2436,101 @@ function shrub(ctx, x, y, s, time, hot, young) {
 
 const Plant = {
   tissue: false, cutDone: false, sterile: false, plated: false, xfer: false,
-  temp: 24, light: 55, nut: 70, day: 0, bio: 0, contam: false, ex: null, drag: false, timer: null, wean: 0,
-  reset() {
+  temp: 24, light: 60, nut: 75, aux: 48, cyto: 52,
+  day: 0, bio: 0, contam: false, ex: null, grab: null, wean: 0, dunk: 0, dunked: false,
+  shoots: 0, roots: 0, pots: [false, false, false, false], acc: 0, _hud: "", splash: 0,
+  reset(log) {
     clearInterval(this.timer);
-    Object.assign(this, { tissue: false, cutDone: false, sterile: false, plated: false, xfer: false, day: 0, bio: 0, contam: false, ex: null, drag: false, timer: null, wean: 0 });
+    const L = this.layout();
+    Object.assign(this, {
+      tissue: false, cutDone: false, sterile: false, plated: false, xfer: false,
+      day: 0, bio: 0, contam: false, ex: null, grab: null, wean: 0, dunk: 0, dunked: false,
+      shoots: 0, roots: 0, pots: [false, false, false, false], acc: 0, _hud: "", splash: 0,
+      timer: null, carry: null, sel: null,
+      shears: { x: L.shears.x, y: L.shears.y },
+      auxBot: { x: L.aux.x, y: L.aux.y },
+      cytoBot: { x: L.cyto.x, y: L.cyto.y },
+      _now: performance.now()
+    });
+    const tEl = $("#pTemp"); if (tEl) tEl.value = 24; this.temp = 24;
+    const lEl = $("#pLight"); if (lEl) lEl.value = 60; this.light = 60;
+    const nEl = $("#pNut"); if (nEl) nEl.value = 75; this.nut = 75;
+    const aEl = $("#pAux"); if (aEl) aEl.value = 48; this.aux = 48;
+    const cEl = $("#pCyto"); if (cEl) cEl.value = 52; this.cyto = 52;
+    if (log) NB.add("plant", "Laminar bench reset.");
+  },
+  layout() {
+    const w = innerWidth, h = innerHeight;
+    const p = { x: w * 0.17, y: h * 0.80 };
+    return {
+      w, h, parent: p,
+      nodes: [
+        { id: "tip", x: p.x + 4, y: p.y - 158, r: 26, label: "shoot apex" },
+        { id: "ax", x: p.x - 22, y: p.y - 96, r: 22, label: "axillary bud" }
+      ],
+      dish: { x: w * 0.36, y: h * 0.78, r: 52 },
+      flask: { x: w * 0.56, y: h * 0.56 },
+      house: { x: w * 0.78, y: h * 0.44, bw: w * 0.26, bh: h * 0.48 },
+      shears: { x: w * 0.28, y: h * 0.90 },
+      aux: { x: w * 0.44, y: h * 0.20 },
+      cyto: { x: w * 0.51, y: h * 0.20 }
+    };
+  },
+  stage() {
+    if (this.xfer) return "gh";
+    if (this.contam) return "contam";
+    if (!this.tissue) return "find";
+    if (!this.cutDone) return "cut";
+    if (!this.plated && !this.sterile) return "ster";
+    if (!this.plated) return "plate";
+    if (this.bio < 20) return "explant";
+    if (this.bio < 40) return "callus";
+    if (this.bio < 62) return "organs";
+    return "plantlets";
+  },
+  steps() {
+    return {
+      find: "1 / 6  ·  Click a totipotent meristem — shoot apex or axillary bud.",
+      cut: "2 / 6  ·  Drag the shears onto the glowing meristem to take an explant.",
+      ster: "3 / 6  ·  Dunk the explant in sterilant until the dish rings. Surface microbes must die.",
+      plate: "4 / 6  ·  Drop the explant onto sterile agar. Hormones in the medium will steer development.",
+      explant: "Explant on agar. Cells dividing by mitosis — the parent genome is copied, not shuffled.",
+      callus: "Callus: unspecialised totipotent mass. Cytokinin → shoots. Auxin → roots.",
+      organs: "Organs forming. You need shoots and roots before weaning.",
+      plantlets: "5 / 6  ·  Plantlets ready. Drag one into a greenhouse pot, or use Acclimatise.",
+      contam: "Contamination. Fungi outgrew the explant. Reset — you cannot skip sterilisation.",
+      gh: "6 / 6  ·  Acclimatised clones. Same nuclear DNA as the parent. Phenotype can still differ."
+    };
+  },
+  hudLine() { return this.steps()[this.stage()] || this.steps().find; },
+  fail(m) {
+    audio.bad();
+    toast(m, "warn");
+    NB.add("plant", "Error: " + m);
+    sim.classList.remove("shake");
+    void sim.offsetWidth;
+    sim.classList.add("shake");
+  },
+  tickDay() {
+    if (!this.plated) return;
+    this.day++;
+    const ts = 1 - Math.abs(this.temp - 24) / 22;
+    const ls = 1 - Math.abs(this.light - 60) / 75;
+    const ns = this.nut / 100;
+    const horm = Math.min(this.aux, this.cyto) / 55 * (1 - Math.abs(this.aux - this.cyto) / 140);
+    if (!this.sterile && this.day >= 2) this.contam = true;
+    if (this.contam) {
+      this.bio = Math.max(0, this.bio - 8);
+      NB.add("plant", `Day ${this.day} · contamination overtaking the flask.`);
+      return;
+    }
+    const g = Math.max(0, ts * ls * ns * (0.35 + horm * 0.9)) * 7.2;
+    this.bio = Math.min(100, this.bio + g);
+    this.shoots = Math.min(1, this.shoots + (this.cyto / 140) * (this.bio > 28 ? 0.12 : 0.02));
+    this.roots = Math.min(1, this.roots + (this.aux / 140) * (this.bio > 28 ? 0.12 : 0.02));
+    if (this.light < 18) this.shoots = Math.max(0.05, this.shoots - 0.04);
+    NB.add("plant", `Day ${this.day} · ${this.stage()} · biomass ${Math.round(this.bio)}%`);
+    if (this.bio >= 78 && this.sterile && this.shoots > 0.45 && this.roots > 0.35) markDone("plant");
   },
   tickDay() {
     if (!this.plated) return;
@@ -2452,42 +2544,161 @@ const Plant = {
     if (this.bio >= 78 && this.sterile) markDone("plant");
   },
   tick() {
-    if (this.wean > 0 && this.wean < 1) this.wean = Math.min(1, this.wean + 0.016);
-    const w = innerWidth, h = innerHeight, ctx = fit(sim, w, h);
-    ctx.clearRect(0, 0, w, h);
-    drawDust(ctx, w, h, t * 0.6, 18);
-    const gnd = ctx.createLinearGradient(0, h * 0.7, 0, h);
-    gnd.addColorStop(0, "rgba(10,18,12,0)");
-    gnd.addColorStop(1, "rgba(8,16,10,0.45)");
-    ctx.fillStyle = gnd;
-    ctx.fillRect(0, h * 0.68, w, h * 0.32);
-
-    const px = w * 0.2, py = h * 0.78;
-    ctx.fillStyle = "rgba(18,36,20,0.55)";
-    ctx.beginPath(); ctx.ellipse(px, py + 10, 64, 12, 0, 0, Math.PI * 2); ctx.fill();
-    shrub(ctx, px, py, 1.05, t, this.tissue && !this.cutDone, false);
-    ctx.fillStyle = "rgba(212,180,138,0.7)";
-    ctx.font = "12px IBM Plex Sans";
-    ctx.textAlign = "center";
-    ctx.fillText("Parent  ·  totipotent shoot", px, py + 36);
-
-    const dx = w * 0.52, dy = h * 0.58;
-    this.drawFlask(ctx, dx, dy);
-    if (this.cutDone && this.ex && !this.plated && !this.drag) coast(this.ex, 0.9);
-    if (this.cutDone && this.ex && !this.plated) {
-      snapRing(ctx, dx, dy, 92, dist(this.ex, { x: dx, y: dy }) < 120);
-      this.drawExplant(ctx, this.ex.x, this.ex.y, 1);
+    const L = this.layout();
+    if (!this.shears) this.reset(false);
+    const now = performance.now();
+    const dt = Math.min(0.033, Math.max(0.008, (now - (this._now || now - 16)) / 1000));
+    this._now = now;
+    if (this.wean > 0 && this.wean < 1) this.wean = Math.min(1, this.wean + 0.018);
+    if (this.splash > 0) this.splash = Math.max(0, this.splash - dt * 1.8);
+    if (this.grab !== "shears") {
+      this.shears.x = lerp(this.shears.x, L.shears.x, 0.06);
+      this.shears.y = lerp(this.shears.y, L.shears.y, 0.06);
     }
+    if (this.grab !== "aux") { this.auxBot.x = lerp(this.auxBot.x, L.aux.x, 0.08); this.auxBot.y = lerp(this.auxBot.y, L.aux.y, 0.08); }
+    if (this.grab !== "cyto") { this.cytoBot.x = lerp(this.cytoBot.x, L.cyto.x, 0.08); this.cytoBot.y = lerp(this.cytoBot.y, L.cyto.y, 0.08); }
+    if (this.grab === "ex" && this.ex) {
+      const dish = L.dish;
+      if (dist(this.ex, dish) < dish.r + 10) {
+        this.dunk = Math.min(1, this.dunk + dt * 0.7);
+        this.splash = 1;
+        if (this.dunk >= 1 && !this.sterile) {
+          this.sterile = true;
+          this.dunked = true;
+          audio.wet();
+          NB.add("plant", "Surface sterilised in disinfectant.");
+          toast("Surface sterile. Plate it before microbes recolonise.", "");
+        }
+      }
+    } else if (this.cutDone && this.ex && !this.plated) coast(this.ex, 0.88);
+    if (this.plated && !this.xfer) {
+      this.acc += dt;
+      if (this.acc > 0.9) { this.acc = 0; this.tickDay(); }
+    }
+    this.draw();
+    const msg = this.hudLine();
+    if (this._hud !== msg) {
+      this._hud = msg;
+      const el = $("#pStep");
+      if (el) el.textContent = msg;
+    }
+    status(msg, acc(this.contam ? 3 : 0));
+  },
+  draw() {
+    const L = this.layout(), w = L.w, h = L.h;
+    const ctx = fit(sim, w, h);
+    ctx.clearRect(0, 0, w, h);
+    drawDust(ctx, w, h, t * 0.55, 22);
+    const gnd = ctx.createLinearGradient(0, h * 0.62, 0, h);
+    gnd.addColorStop(0, "rgba(10,18,12,0)");
+    gnd.addColorStop(1, "rgba(8,18,12,0.55)");
+    ctx.fillStyle = gnd;
+    ctx.fillRect(0, h * 0.6, w, h * 0.4);
+    ctx.fillStyle = "rgba(28,22,16,0.45)";
+    ctx.fillRect(0, h * 0.86, w, 10);
+    ctx.fillStyle = "rgba(200,210,200,0.28)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.fillText("LAMINAR FLOW  ·  sterile cabinet", 18, 28);
 
-    ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(212,180,138,0.7)";
-    ctx.font = "12px IBM Plex Mono";
-    ctx.fillText(`Day ${this.day}  ·  biomass ${Math.round(this.bio)}%  ·  ${this.temp}°C`, dx, dy + 118);
+    this.drawParent(ctx, L);
+    this.drawDish(ctx, L.dish);
+    this.drawFlask(ctx, L.flask.x, L.flask.y);
+    this.drawBottle(ctx, this.auxBot.x, this.auxBot.y, "#c47a4a", "auxin", this.grab === "aux");
+    this.drawBottle(ctx, this.cytoBot.x, this.cytoBot.y, "#6ec4a0", "cytokinin", this.grab === "cyto");
+    this.drawShears(ctx, this.shears.x, this.shears.y, this.grab === "shears");
+    if (this.cutDone && this.ex && !this.plated) {
+      snapRing(ctx, L.dish.x, L.dish.y, L.dish.r + 8, dist(this.ex, L.dish) < L.dish.r + 12);
+      snapRing(ctx, L.flask.x, L.flask.y, 92, dist(this.ex, L.flask) < 120);
+      this.drawExplant(ctx, this.ex.x, this.ex.y, 1.05);
+    }
+    if (this.grab === "plantlet" && this.carry) this.drawExplant(ctx, this.carry.x, this.carry.y, 1.15);
+    this.drawGreenhouse(ctx, L);
+    this.drawMeters(ctx, L);
+  },
+  drawParent(ctx, L) {
+    const p = L.parent;
+    ctx.fillStyle = "rgba(18,36,20,0.55)";
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 10, 64, 12, 0, 0, Math.PI * 2); ctx.fill();
+    pot(ctx, p.x, p.y + 8, 1.05);
+    shrub(ctx, p.x, p.y, 1.08, t, this.tissue && !this.cutDone, false);
+    L.nodes.forEach((n) => {
+      const on = this.sel === n.id || (!this.cutDone && this.tissue);
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + Math.sin(t * 5) * 2, 0, Math.PI * 2);
+      ctx.strokeStyle = on ? "rgba(142,224,184,0.9)" : "rgba(142,224,184,0.28)";
+      ctx.lineWidth = on ? 2.2 : 1;
+      ctx.stroke();
+      if (!this.cutDone) {
+        ctx.fillStyle = "rgba(232,239,230,0.7)";
+        ctx.font = "11px IBM Plex Sans"; ctx.textAlign = "center";
+        ctx.fillText(n.label, n.x, n.y - 22);
+      }
+    });
+    ctx.fillStyle = "rgba(212,180,138,0.75)";
+    ctx.font = "12px IBM Plex Sans"; ctx.textAlign = "center";
+    ctx.fillText("Parent  ·  totipotent meristems", p.x, p.y + 40);
     ctx.textAlign = "start";
-
-    if (this.xfer) this.drawGreenhouse(ctx, w, h);
-
-    status(this.contam ? "Contamination. The explant was not sterilised." : this.xfer ? "Acclimatised clones — same nuclear genes as the parent." : !this.tissue ? "Select shoot tissue on the parent." : !this.cutDone ? "Cut an explant — button at the right, or click the plant again." : !this.plated ? "Drag the explant into the vessel." : `Day ${this.day} · growth responding to climate.`, acc(this.contam ? 3 : 0));
+  },
+  drawDish(ctx, d) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath(); ctx.ellipse(d.x, d.y + 8, d.r + 8, 8, 0, 0, Math.PI * 2); ctx.fill();
+    const fill = ctx.createRadialGradient(d.x - 8, d.y - 6, 4, d.x, d.y, d.r);
+    fill.addColorStop(0, this.sterile ? "rgba(180,220,210,0.45)" : "rgba(160,200,220,0.4)");
+    fill.addColorStop(1, "rgba(30,60,80,0.55)");
+    ctx.beginPath(); ctx.ellipse(d.x, d.y, d.r, d.r * 0.38, 0, 0, Math.PI * 2);
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = "rgba(210,230,240,0.55)"; ctx.lineWidth = 3; ctx.stroke();
+    if (this.splash > 0.05) {
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = `rgba(180,220,230,${0.25 * this.splash})`;
+        ctx.beginPath();
+        ctx.arc(d.x + Math.sin(t * 8 + i) * 18, d.y - 10 - i * 2 * this.splash, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = "rgba(200,220,230,0.7)";
+    ctx.font = "11px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("sterilant  ·  dunk fully", d.x, d.y + d.r * 0.38 + 16);
+    if (this.dunk > 0 && !this.plated) {
+      ctx.fillStyle = "rgba(255,255,255,0.1)";
+      ctx.fillRect(d.x - 40, d.y - 40, 80, 5);
+      ctx.fillStyle = "#8ee0b8";
+      ctx.fillRect(d.x - 40, d.y - 40, 80 * this.dunk, 5);
+    }
+    ctx.textAlign = "start";
+    ctx.restore();
+  },
+  drawBottle(ctx, x, y, col, label, hot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = hot ? col : "rgba(20,24,22,0.7)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-14, -28, 28, 48, 6); else ctx.rect(-14, -28, 28, 48);
+    ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = hot ? 2.2 : 1.2; ctx.stroke();
+    ctx.fillStyle = col;
+    ctx.fillRect(-6, -36, 12, 10);
+    ctx.fillStyle = "rgba(232,239,230,0.8)";
+    ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText(label, 0, 32);
+    ctx.textAlign = "start";
+    ctx.restore();
+  },
+  drawShears(ctx, x, y, hot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-0.4);
+    ctx.strokeStyle = hot ? "#e8e8e0" : "rgba(200,210,200,0.7)";
+    ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-18, 8); ctx.lineTo(22, -10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-18, -4); ctx.lineTo(22, 6); ctx.stroke();
+    ctx.fillStyle = "#8a4a2c";
+    ctx.fillRect(-26, -8, 12, 16);
+    ctx.restore();
+    ctx.fillStyle = "rgba(200,210,200,0.55)";
+    ctx.font = "10px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("shears", x, y + 22);
+    ctx.textAlign = "start";
   },
   drawFlask(ctx, dx, dy) {
     ctx.save();
@@ -2505,149 +2716,248 @@ const Plant = {
     glass.addColorStop(0, "rgba(190,220,210,0.16)");
     glass.addColorStop(0.45, "rgba(40,70,55,0.28)");
     glass.addColorStop(1, "rgba(12,24,18,0.5)");
-    ctx.fillStyle = glass;
-    ctx.fill();
-    ctx.strokeStyle = "rgba(210,230,220,0.45)";
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    ctx.fillStyle = glass; ctx.fill();
+    ctx.strokeStyle = "rgba(210,230,220,0.45)"; ctx.lineWidth = 3; ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(dx - 22, dy - 108); ctx.lineTo(dx + 22, dy - 108);
-    ctx.lineTo(dx + 26, dy - 118); ctx.lineTo(dx - 26, dy - 118);
+    ctx.lineTo(dx + 26, dy - 122); ctx.lineTo(dx - 26, dy - 122);
     ctx.closePath();
-    ctx.fillStyle = "rgba(200,220,210,0.2)";
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = this.plated ? "rgba(240,236,220,0.45)" : "rgba(200,220,210,0.2)";
+    ctx.fill(); ctx.stroke();
     ctx.fillStyle = this.contam ? "rgba(110,62,28,0.78)" : "rgba(72,98,36,0.7)";
-    ctx.beginPath();
-    ctx.ellipse(dx, dy + 38, 58, 22, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(dx, dy + 38, 58, 22, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = this.contam ? "rgba(150,80,30,0.45)" : "rgba(90,120,40,0.45)";
-    ctx.beginPath();
-    ctx.ellipse(dx, dy + 22, 52, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(dx - 48, dy - 20);
-    ctx.quadraticCurveTo(dx - 40, dy + 20, dx - 36, dy + 58);
-    ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(dx, dy + 22, 52, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(dx - 48, dy - 20); ctx.quadraticCurveTo(dx - 40, dy + 20, dx - 36, dy + 58); ctx.stroke();
     if (this.contam) {
-      for (let i = 0; i < 22; i++) {
+      for (let i = 0; i < 26; i++) {
         ctx.fillStyle = `rgba(180,70,30,${0.18 + (i % 5) * 0.08})`;
         ctx.beginPath();
         ctx.arc(dx + Math.sin(t * 0.7 + i) * 42, dy + 8 + Math.cos(t * 0.5 + i * 1.3) * 28, 2 + i % 4, 0, Math.PI * 2);
         ctx.fill();
       }
-    } else if (this.plated) {
-      const g = this.bio / 100;
-      if (g < 0.22) {
-        ctx.fillStyle = "#c4b070";
-        ctx.beginPath(); ctx.ellipse(dx, dy + 18, 14 + g * 20, 8 + g * 10, 0, 0, Math.PI * 2); ctx.fill();
-      } else {
-        const n = g < 0.4 ? 2 : g < 0.65 ? 3 : 5;
-        for (let i = 0; i < n; i++) {
-          const ox = (i - (n - 1) / 2) * 16;
-          shrub(ctx, dx + ox, dy + 22, 0.28 + g * 0.28, t + i, false, true);
-        }
-      }
-    } else if (this.cutDone && this.ex) {
-      /* empty sterile medium waiting */
-    }
+    } else if (this.plated) this.drawCulture(ctx, dx, dy);
+    ctx.fillStyle = "rgba(212,180,138,0.7)";
+    ctx.font = "11px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("in vitro  ·  " + (this.contam ? "contaminated" : this.plated ? this.stage() : "agar + hormones"), dx, dy + 118);
+    ctx.textAlign = "start";
     ctx.restore();
+  },
+  drawCulture(ctx, dx, dy) {
+    const g = this.bio / 100;
+    const pale = this.light < 22 ? 0.45 : 1;
+    if (g < 0.2) {
+      this.drawExplant(ctx, dx, dy + 10, 0.85);
+      return;
+    }
+    ctx.fillStyle = `rgba(196,176,112,${0.55 + g * 0.3})`;
+    ctx.beginPath(); ctx.ellipse(dx, dy + 16, 12 + g * 28, 7 + g * 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(232,220,160,0.35)";
+    ctx.beginPath(); ctx.ellipse(dx - 4, dy + 8, 8 + g * 10, 5, 0, 0, Math.PI * 2); ctx.fill();
+    if (this.shoots > 0.2) {
+      const n = this.shoots > 0.7 ? 4 : this.shoots > 0.4 ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const ox = (i - (n - 1) / 2) * 14;
+        ctx.save(); ctx.globalAlpha = pale;
+        shrub(ctx, dx + ox, dy + 10, 0.18 + this.shoots * 0.22, t + i, false, true);
+        ctx.restore();
+      }
+    }
+    if (this.roots > 0.25) {
+      ctx.strokeStyle = `rgba(180,140,80,${0.35 + this.roots * 0.4})`;
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.moveTo(dx - 10 + i * 5, dy + 28);
+        ctx.quadraticCurveTo(dx - 16 + i * 8, dy + 40 + this.roots * 10, dx - 8 + i * 4, dy + 48);
+        ctx.stroke();
+      }
+    }
   },
   drawExplant(ctx, x, y, s) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(-0.4);
     ctx.scale(s, s);
-    ctx.strokeStyle = "#4a8a40";
+    ctx.strokeStyle = this.sterile ? "#7dffb0" : "#4a8a40";
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(-10, 8); ctx.lineTo(12, -10); ctx.stroke();
     leaf(ctx, 4, -6, -0.8, 18, 7, this.sterile ? "#7dffb0" : "#5dcc7a", 0);
     leaf(ctx, 8, -2, 0.5, 14, 6, "#4cbf6a", 0);
     ctx.restore();
   },
-  drawGreenhouse(ctx, w, h) {
-    const u = this.wean;
+  drawGreenhouse(ctx, L) {
+    const H = L.house, u = this.wean;
     ctx.save();
-    ctx.globalAlpha = 0.35 + 0.65 * u;
-    ctx.fillStyle = "rgba(12,22,16,0.55)";
-    ctx.fillRect(w * 0.68, h * 0.42, w * 0.3, h * 0.46);
-    ctx.strokeStyle = "rgba(160,200,170,0.25)";
-    ctx.strokeRect(w * 0.68, h * 0.42, w * 0.3, h * 0.46);
-    ctx.fillStyle = "rgba(90,70,40,0.55)";
-    ctx.fillRect(w * 0.69, h * 0.78, w * 0.28, 10);
+    ctx.globalAlpha = this.xfer ? 0.4 + 0.6 * u : 0.55;
+    ctx.fillStyle = "rgba(14,28,20,0.55)";
+    ctx.fillRect(H.x - H.bw * 0.42, H.y, H.bw, H.bh);
+    ctx.strokeStyle = "rgba(160,210,180,0.28)"; ctx.lineWidth = 2;
+    ctx.strokeRect(H.x - H.bw * 0.42, H.y, H.bw, H.bh);
+    ctx.beginPath();
+    ctx.moveTo(H.x - H.bw * 0.42, H.y);
+    ctx.lineTo(H.x, H.y - 28);
+    ctx.lineTo(H.x + H.bw * 0.58, H.y);
+    ctx.strokeStyle = "rgba(180,230,200,0.35)"; ctx.stroke();
     ctx.fillStyle = "#d4b48a";
     ctx.font = "11px IBM Plex Mono";
-    ctx.fillText("GREENHOUSE  ·  clones of the parent", w * 0.7, h * 0.46);
-    const n = 4;
-    for (let i = 0; i < n; i++) {
-      const x = w * 0.73 + (i % 2) * w * 0.12;
-      const y = h * 0.62 + Math.floor(i / 2) * h * 0.16;
-      const sc = (0.42 + 0.12 * u) * (0.92 + (i % 3) * 0.03);
-      pot(ctx, x, y + 8, 0.85);
-      shrub(ctx, x, y, sc, t + i * 0.4, false, true);
+    ctx.fillText("GREENHOUSE  ·  acclimatise", H.x - H.bw * 0.38, H.y + 18);
+    for (let i = 0; i < 4; i++) {
+      const x = H.x - 28 + (i % 2) * 78;
+      const y = H.y + 78 + Math.floor(i / 2) * 86;
+      pot(ctx, x, y + 8, 0.82);
+      if (this.pots[i]) {
+        const sc = (0.38 + 0.14 * u) * (0.94 + (i % 3) * 0.04);
+        shrub(ctx, x, y, sc, t + i * 0.4, false, true);
+      } else if (this.stage() === "plantlets" || this.xfer) {
+        snapRing(ctx, x, y, 36, this.grab === "plantlet" && this.carry && dist(this.carry, { x, y }) < 40);
+      }
     }
     ctx.restore();
   },
+  drawMeters(ctx, L) {
+    const x = L.flask.x, y = L.h * 0.12;
+    ctx.fillStyle = "rgba(8,12,10,0.4)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - 120, y - 8, 240, 46, 8); else ctx.rect(x - 120, y - 8, 240, 46);
+    ctx.fill();
+    ctx.fillStyle = "rgba(200,210,200,0.75)";
+    ctx.font = "11px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText(`Day ${this.day}  ·  ${Math.round(this.bio)}%  ·  ${this.temp}°C  ·  light ${this.light}`, x, y + 10);
+    ctx.fillText(`shoots ${Math.round(this.shoots * 100)}%  ·  roots ${Math.round(this.roots * 100)}%  ·  ${this.sterile ? "sterile" : "not sterilised"}`, x, y + 26);
+    ctx.textAlign = "start";
+  },
   down(p) {
-    if (inspect) {
-      if (this.xfer && p.x > innerWidth * 0.68) callout("Acclimatised clones", "Weaned from in vitro culture. Same nuclear DNA as the parent shoot. Phenotype can still differ with greenhouse conditions.", p.x, p.y);
-      else if (p.x < innerWidth * 0.34) callout("Parent shoot", "Totipotent tissue. An explant from here can rebuild a whole plant.", p.x, p.y);
-      else callout("Culture vessel", "Sterile nutrient medium. Callus, then plantlets, then acclimatise.", p.x, p.y);
+    if (inspect) return this.inspectAt(p);
+    const L = this.layout();
+    if (this.shears && dist(p, this.shears) < 36) { this.grab = "shears"; audio.grab(); return; }
+    if (this.auxBot && dist(p, this.auxBot) < 30) { this.grab = "aux"; audio.grab(); return; }
+    if (this.cytoBot && dist(p, this.cytoBot) < 30) { this.grab = "cyto"; audio.grab(); return; }
+    if (this.cutDone && this.ex && !this.plated && dist(p, this.ex) < 32) { this.grab = "ex"; audio.grab(); return; }
+    if ((this.stage() === "plantlets" || this.xfer) && dist(p, L.flask) < 90) {
+      if (this.contam) return this.fail("Contaminated culture cannot be weaned.");
+      if (this.shoots < 0.4 || this.roots < 0.3) return this.fail("Need both shoots (cytokinin) and roots (auxin) before weaning.");
+      this.grab = "plantlet";
+      this.carry = { x: p.x, y: p.y };
+      audio.grab();
       return;
     }
-    if (p.x < innerWidth * 0.42 && p.y > innerHeight * 0.18 && p.y < innerHeight * 0.88) {
-      if (!this.tissue) { this.tissue = true; audio.ok(); toast("Shoot selected. Drag from the parent to take an explant.", ""); return; }
-      if (!this.cutDone) { this.takeCut(); this.drag = true; return; }
+    const node = L.nodes.find((n) => dist(p, n) < n.r + 8);
+    if (node && !this.cutDone) {
+      this.tissue = true;
+      this.sel = node.id;
+      audio.ok();
+      toast("Meristem selected — totipotent. Cut with the shears.", "");
+      NB.add("plant", "Selected " + node.label + " (totipotent).");
     }
-    if (this.ex && dist(p, this.ex) < 28) this.drag = true;
   },
   move(p) {
-    if (this.drag && this.ex) {
-      this.ex.vx = p.x - this.ex.x; this.ex.vy = p.y - this.ex.y;
-      this.ex.x = p.x; this.ex.y = p.y;
-    }
+    if (this.grab === "shears") { this.shears.x = p.x; this.shears.y = p.y; }
+    else if (this.grab === "aux") { this.auxBot.x = p.x; this.auxBot.y = p.y; }
+    else if (this.grab === "cyto") { this.cytoBot.x = p.x; this.cytoBot.y = p.y; }
+    else if (this.grab === "ex" && this.ex) { this.ex.x = p.x; this.ex.y = p.y; }
+    else if (this.grab === "plantlet") { this.carry = { x: p.x, y: p.y }; }
   },
   up(p) {
-    if (!this.drag) return;
-    this.drag = false;
-    const dx = innerWidth * 0.52, dy = innerHeight * 0.58;
-    if (dist(p, { x: dx, y: dy }) < 120) this.plate();
+    const L = this.layout();
+    const g = this.grab;
+    this.grab = null;
+    if (g === "shears") {
+      const node = L.nodes.find((n) => dist(this.shears, n) < n.r + 18);
+      if (node) { this.tissue = true; this.sel = node.id; this.takeCut(node); }
+      return;
+    }
+    if (g === "ex" && this.ex) {
+      if (dist(p, L.flask) < 110) this.plate();
+      return;
+    }
+    if (g === "aux" && dist(this.auxBot, L.flask) < 110) {
+      this.aux = Math.min(100, this.aux + 14);
+      const el = $("#pAux"); if (el) el.value = this.aux;
+      audio.place(); toast("Auxin up. Favours roots from callus.", "");
+    }
+    if (g === "cyto" && dist(this.cytoBot, L.flask) < 110) {
+      this.cyto = Math.min(100, this.cyto + 14);
+      const el = $("#pCyto"); if (el) el.value = this.cyto;
+      audio.place(); toast("Cytokinin up. Favours shoots from callus.", "");
+    }
+    if (g === "plantlet" && this.carry) {
+      let hit = -1;
+      for (let i = 0; i < 4; i++) {
+        const x = L.house.x - 28 + (i % 2) * 78;
+        const y = L.house.y + 78 + Math.floor(i / 2) * 86;
+        if (dist(this.carry, { x, y }) < 42) hit = i;
+      }
+      this.carry = null;
+      if (hit >= 0) this.plantPot(hit);
+      else this.fail("Drop the plantlet into an empty greenhouse pot.");
+    }
   },
-  takeCut() {
-    if (!this.tissue) return toast("Click the parent plant on the left first, then cut.", "warn");
+  takeCut(node) {
+    if (!this.tissue) return this.fail("Select a meristem on the parent first.");
     if (this.cutDone) return;
     this.cutDone = true;
-    this.ex = { x: innerWidth * 0.28, y: innerHeight * 0.38 };
+    this.sel = node ? node.id : this.sel;
+    this.ex = { x: innerWidth * 0.26, y: innerHeight * 0.42, vx: 0, vy: 0 };
     audio.snip();
-    toast("Explant in the forceps. Sterilise, then drop it in the flask.", "");
+    NB.add("plant", "Explant cut from totipotent tissue.");
+    toast("Explant taken. Dunk it in sterilant — do not skip.", "");
   },
-  ster() { if (!this.cutDone) return toast("Cut first.", "warn"); this.sterile = true; audio.ok(); NB.add("plant", "Surface sterilised."); },
   plate() {
     if (!this.cutDone) return;
     this.plated = true;
+    this.bio = 6;
     audio.place();
-    clearInterval(this.timer);
-    this.timer = setInterval(() => this.tickDay(), 1100);
-    NB.add("plant", this.sterile ? "Plated on sterile medium." : "Plated without sterilisation.");
+    NB.add("plant", this.sterile ? "Plated on sterile nutrient medium." : "Plated without sterilisation — contamination likely.");
+    toast(this.sterile ? "On agar. Watch callus, then organs. Balance the hormones." : "Unsterilised explant on agar. Microbes will win.", this.sterile ? "" : "warn");
+  },
+  plantPot(i) {
+    if (this.contam) return this.fail("Contaminated culture cannot be weaned.");
+    if (this.bio < 55 || this.shoots < 0.4 || this.roots < 0.3) return this.fail("Wait for rooted shoots. Auxin and cytokinin both needed.");
+    this.pots[i] = true;
+    this.xfer = true;
+    this.wean = Math.max(this.wean, 0.04);
+    markDone("plant"); markSim("plant");
+    audio.ok();
+    NB.add("plant", "Plantlet acclimatised. Clone of the parent nuclear genome.");
+    toast("Weaned clone. Same genes as the parent meristem. Greenhouse phenotype can still differ.", "");
   },
   xferOut() {
-    if (this.contam) return toast("Contaminated culture cannot be weaned.", "warn");
-    if (this.bio < 55) return toast("Wait for plantlets.", "warn");
+    if (this.contam) return this.fail("Contaminated culture cannot be weaned.");
+    if (this.bio < 55 || this.shoots < 0.4 || this.roots < 0.3) return this.fail("Wait for rooted plantlets. Raise the missing hormone if shoots or roots are weak.");
+    this.pots = this.pots.map(() => true);
     this.xfer = true;
     this.wean = 0.04;
-    markDone("plant"); markSim("plant"); audio.ok();
+    markDone("plant"); markSim("plant");
+    audio.ok();
     toast("Plantlets weaned. Clones of the parent, now in the greenhouse.", "");
+  },
+  inspectAt(p) {
+    const L = this.layout();
+    const node = L.nodes.find((n) => dist(p, n) < n.r + 10);
+    if (node) callout(node.label, "Meristem. Many plant cells stay totipotent, so this piece can rebuild a whole plant (5.17B).", p.x, p.y);
+    else if (dist(p, L.dish) < L.dish.r + 12) callout("Surface sterilant", "Kills microbes on the explant. Skip this and fungi take the flask.", p.x, p.y);
+    else if (dist(p, L.flask) < 90) callout("Nutrient medium", "In vitro agar + hormones. Callus, then shoots and roots. Mitosis copies the parent genome.", p.x, p.y);
+    else if (p.x > L.house.x - L.house.bw * 0.45) callout("Greenhouse", "Acclimatise plantlets. They are genetically identical to the parent. Light and humidity still change phenotype.", p.x, p.y);
+    else if (dist(p, this.auxBot) < 28) callout("Auxin", "Favours root formation from callus.", p.x, p.y);
+    else if (dist(p, this.cytoBot) < 28) callout("Cytokinin", "Favours shoot formation from callus.", p.x, p.y);
+    else hideCallout();
   }
 };
 function bindPlantDock() {
-  $("#pCut").onclick = (e) => { e.stopPropagation(); Plant.takeCut(); };
-  $("#pSter").onclick = (e) => { e.stopPropagation(); Plant.ster(); };
-  $("#pPlate").onclick = (e) => { e.stopPropagation(); Plant.plate(); };
-  $("#pTemp").oninput = (e) => { Plant.temp = Number(e.target.value); };
-  $("#pLight").oninput = (e) => { Plant.light = Number(e.target.value); };
-  $("#pNut").oninput = (e) => { Plant.nut = Number(e.target.value); };
+  const sync = () => {
+    Plant.temp = Number($("#pTemp").value);
+    Plant.light = Number($("#pLight").value);
+    Plant.nut = Number($("#pNut").value);
+    Plant.aux = Number($("#pAux").value);
+    Plant.cyto = Number($("#pCyto").value);
+  };
+  $("#pTemp").oninput = sync;
+  $("#pLight").oninput = sync;
+  $("#pNut").oninput = sync;
+  $("#pAux").oninput = sync;
+  $("#pCyto").oninput = sync;
   $("#pXfer").onclick = (e) => { e.stopPropagation(); Plant.xferOut(); };
 }
 
