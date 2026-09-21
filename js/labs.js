@@ -1,7 +1,7 @@
-import { markSim } from "./ui.js?v=43";
+import { markSim } from "./ui.js?v=44";
 import {
   $, $$, fit, dist, lerp, drawCell, drawHelix, drawDust, toast, audio, NB, markDone, callout, hideCallout, done
-} from "./core.js?v=43";
+} from "./core.js?v=44";
 
 const sim = $("#sim");
 let scene = "intro";
@@ -58,7 +58,6 @@ function hudFor(id) {
     define: ["Definition", "What is a clone?", "Microscope bench. Copy nuclear DNA by mitosis. Same genes ≠ same phenotype. Then identify the clone."],
     learn: ["Curriculum", "Edexcel 4BI1 cloning", "Read, then try the lab, then answer."],
     quiz: ["Quiz", "Check your understanding", "Choose A–D, then submit."],
-    exam: ["Exam pad", "Use mark-scheme language", "Nuclear DNA · mitosis · enucleated egg · surrogate."],
     glossary: ["Glossary", "Terms from the specification", "Select a word for a short definition."],
     scnt: ["SCNT laboratory", "Micromanipulation · 5.19B", "Aspirate somatic nucleus → enucleate egg → transfer → pulse starts the cell cycle → S-phase copies donor DNA → mitosis → blastocyst → surrogate."],
     dolly: ["Roslin 1996", "Repeat Dolly’s protocol", "G0 mammary nucleus from Finn-Dorset. Enucleated Blackface egg. Pulse starts mitosis. Match the barcode."],
@@ -73,12 +72,15 @@ function hudFor(id) {
   $("#hudMark").textContent = m[0];
   $("#hudTitle").textContent = m[1];
   $("#hudObj").textContent = m[2];
+  const st = $("#statusLine");
+  if (st) st.textContent = "—";
 }
 
 function dockFor(id) {
   const d = $("#dock");
   d.onpointerdown = (e) => e.stopPropagation();
   d.onpointerup = (e) => e.stopPropagation();
+  const finish = () => { d.hidden = !d.innerHTML.trim(); };
   if (id === "scnt") {
     d.innerHTML = `
       <p id="scntStep" style="color:var(--mute);font-size:12px;line-height:1.45">Step 1 · aspirate the somatic nucleus</p>
@@ -99,6 +101,7 @@ function dockFor(id) {
       <button type="button" id="implant" disabled>Transfer to surrogate</button>
       <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Green ring = aligned. After the pulse: egg cytoplasm reprogrammes the donor nucleus → S-phase copies that DNA → prophase → metaphase → anaphase → telophase → cytokinesis. Repeat to blastocyst. Mitochondria stay with the egg.</p>`;
     bindScntDock();
+    finish(); return;
   } else if (id === "plant") {
     d.innerHTML = `
       <p id="pStep" style="color:var(--mute);font-size:12px;line-height:1.45">Find a totipotent meristem on the parent (shoot apex or axillary bud).</p>
@@ -110,6 +113,7 @@ function dockFor(id) {
       <button type="button" id="pXfer">Acclimatise plantlets</button>
       <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Click a glowing meristem. Drag shears to cut. Dunk the explant in sterilant. Drop it on agar. Hormones: cytokinin favours shoots, auxin favours roots — you need both to wean. Drag a plantlet into a greenhouse pot.</p>`;
     bindPlantDock();
+    finish(); return;
   } else if (id === "bacteria") {
     d.innerHTML = `
       <p id="bStep" style="color:var(--mute);font-size:12px;line-height:1.4">One cell. Culture to watch binary fission.</p>
@@ -120,6 +124,7 @@ function dockFor(id) {
       <button type="button" id="bView">Microscope / colony</button>
       <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Optimum ~37°C. Click the field to flip views. Descendants are clones until mutation.</p>`;
     bindBacDock();
+    finish(); return;
   } else if (id === "transgenic") {
     d.innerHTML = `
       <p style="color:var(--mute);font-size:12px;line-height:1.4">Concept model of 5.20B — not a restriction-enzyme practical.</p>
@@ -128,12 +133,14 @@ function dockFor(id) {
       <button type="button" id="tgClone">Clone the transgenic host</button>
       <button type="button" id="tgHarvest" disabled>Collect insulin</button>`;
     bindTgDock();
+    finish(); return;
   } else if (id === "dolly") {
     d.innerHTML = `
       <p id="dStep" style="color:var(--mute);font-size:12px;line-height:1.45">1 / 9  ·  Click the cream-faced Finn-Dorset for a mammary cell.</p>
       <button type="button" class="pulse" id="dStarve" disabled><i></i>Hold serum-starve (G0)</button>
       <button type="button" class="pulse" id="dPulse" disabled><i></i>Hold electric pulse</button>`;
     bindDollyDock();
+    finish(); return;
   } else if (id === "define") {
     d.innerHTML = `
       <p id="defStep" style="color:var(--mute);font-size:12px;line-height:1.45">Find the parent nucleus under the objective. Click it to start S-phase.</p>
@@ -146,8 +153,10 @@ function dockFor(id) {
       <button type="button" id="defStill" disabled>Still clones?</button>
       <p style="color:var(--mute);font-size:11px;line-height:1.4;margin:0">Click the nucleus. Drag the sister copy. Do not drop gametes in. After mitosis, drag the lamp or pellet onto Clone B.</p>`;
     bindDefDock();
+    finish(); return;
   } else if (id === "ethics" || id === "exam" || id === "quiz" || id === "learn" || id === "glossary") {
     d.innerHTML = "";
+    finish(); return;
   } else if (id === "master") {
     d.innerHTML = `
       <button type="button" data-ch="plant">Tissue culture</button>
@@ -156,7 +165,9 @@ function dockFor(id) {
       <button type="button" data-ch="tg">Transgenic</button>
       <button type="button" id="chGo">Submit</button>`;
     bindMaster();
+    finish(); return;
   } else d.innerHTML = "";
+  finish();
 }
 
 export function hint() {
@@ -250,7 +261,7 @@ const Define = {
       sperm: { x: w * 0.42, y: h * 0.48 + Math.min(w, h) * 0.22, r: 22 },
       egg: { x: w * 0.56, y: h * 0.48 + Math.min(w, h) * 0.22, r: 28 },
       lamp: { x: w * 0.22, y: h * 0.72 },
-      pellet: { x: w * 0.78, y: h * 0.72 }
+      pellet: { x: w * 0.62, y: h * 0.72 }
     };
   },
   reset(log) {
@@ -2488,7 +2499,7 @@ const Plant = {
       ],
       dish: { x: w * 0.36, y: h * 0.78, r: 52 },
       flask: { x: w * 0.56, y: h * 0.56 },
-      house: { x: w * 0.78, y: h * 0.44, bw: w * 0.26, bh: h * 0.48 },
+      house: { x: w * 0.58, y: h * 0.14, bw: Math.min(300, w * 0.26), bh: Math.min(280, h * 0.34) },
       shears: { x: w * 0.28, y: h * 0.90 },
       aux: { x: w * 0.44, y: h * 0.20 },
       cyto: { x: w * 0.51, y: h * 0.20 }
@@ -3004,18 +3015,18 @@ const Plant = {
 };
 function bindPlantDock() {
   const sync = () => {
-    Plant.temp = Number($("#pTemp").value);
-    Plant.light = Number($("#pLight").value);
-    Plant.nut = Number($("#pNut").value);
-    Plant.aux = Number($("#pAux").value);
-    Plant.cyto = Number($("#pCyto").value);
+    if ($("#pTemp")) Plant.temp = Number($("#pTemp").value);
+    if ($("#pLight")) Plant.light = Number($("#pLight").value);
+    if ($("#pNut")) Plant.nut = Number($("#pNut").value);
+    if ($("#pAux")) Plant.aux = Number($("#pAux").value);
+    if ($("#pCyto")) Plant.cyto = Number($("#pCyto").value);
   };
-  $("#pTemp").oninput = sync;
-  $("#pLight").oninput = sync;
-  $("#pNut").oninput = sync;
-  $("#pAux").oninput = sync;
-  $("#pCyto").oninput = sync;
-  $("#pXfer").onclick = (e) => { e.stopPropagation(); Plant.xferOut(); };
+  ["pTemp", "pLight", "pNut", "pAux", "pCyto"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.oninput = sync;
+  });
+  const x = $("#pXfer");
+  if (x) x.onclick = (e) => { e.stopPropagation(); Plant.xferOut(); };
 }
 
 /* ---------- BACTERIA ---------- */
@@ -3201,7 +3212,7 @@ const Tg = {
       { id: "ker", label: "keratin", x: w * 0.44, y: h * 0.42, ok: false }
     ];
   },
-  host(w, h) { return { x: w * 0.74, y: h * 0.48 }; },
+  host(w, h) { return { x: w * 0.58, y: h * 0.52 }; },
   tick() {
     if (this.settle > 0 && this.settle < 1) {
       this.settle = Math.min(1, this.settle + 0.045);
@@ -3387,18 +3398,20 @@ function bindTgDock() {
 }
 
 /* exam / master */
-let ei = 0, qi = 0, masterPick = null, masterOk = false;
+let ei = 0, qi = 0, masterPick = null, masterOk = false, masterSi = 0;
 function bindExam() {
+  const mark = $("#exMark"), ans = $("#exAns"), next = $("#exNext");
+  if (!mark || !ans) return;
   const item = () => (window.CLONING.EXAM || [])[qi % (window.CLONING.EXAM?.length || 1)];
   $("#hudObj").textContent = item()?.q || "Load exam data.";
-  $("#exMark").onclick = (e) => {
+  mark.onclick = (e) => {
     e.stopPropagation();
     const it = item();
     if (!it) return;
-    const r = window.CLONING.markExam(it, $("#exAns").value);
+    const r = window.CLONING.markExam(it, ans.value);
     toast(`${r.awarded}/${it.marks} — ${it.scheme}`, "");
   };
-  $("#exNext").onclick = (e) => { e.stopPropagation(); qi++; $("#exAns").value = ""; $("#hudObj").textContent = item().q; };
+  if (next) next.onclick = (e) => { e.stopPropagation(); qi++; ans.value = ""; $("#hudObj").textContent = item().q; };
 }
 function bindMaster() {
   const briefs = [
@@ -3407,12 +3420,11 @@ function bindMaster() {
     { q: "Rapidly reproduce a bacterial population from one cell.", m: "bac", lab: "bacteria" },
     { q: "You need an organism containing a gene from another species.", m: "tg", lab: "transgenic" }
   ];
-  let si = 0;
-  $("#hudObj").textContent = Object.values(done).every(Boolean) ? briefs[0].q : "Complete the four flagship laboratories first.";
+  $("#hudObj").textContent = Object.values(done).every(Boolean) ? briefs[masterSi % 4].q : "Complete the four flagship laboratories first.";
   $$("[data-ch]").forEach((b) => b.onclick = (e) => {
     e.stopPropagation();
     if (!Object.values(done).every(Boolean)) return toast("The master lab is locked until all four experiments are complete.", "warn");
-    const sc = briefs[si % 4];
+    const sc = briefs[masterSi % 4];
     if (b.dataset.ch !== sc.m) { audio.bad(); toast("That method does not match this problem.", "warn"); return; }
     masterOk = true; masterPick = sc;
     toast("Method correct. Execute it, then submit.", "");
@@ -3424,7 +3436,7 @@ function bindMaster() {
     const sc = masterPick;
     const ok = (sc.m === "scnt" && SCNT.state === "compare") || (sc.m === "plant" && Plant.xfer) || (sc.m === "bac" && Bac.n >= 32) || (sc.m === "tg" && Tg.cloned);
     toast(ok ? "Biotechnology mastery — procedure complete." : "The procedure is incomplete.", ok ? "" : "warn");
-    if (ok) { si++; masterOk = false; }
+    if (ok) { masterSi++; masterOk = false; $("#hudObj").textContent = briefs[masterSi % 4].q; }
   };
 }
 

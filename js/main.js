@@ -1,9 +1,9 @@
-import { $, $$, audio, toast, NB } from "./core.js?v=43";
-import { initWorld, skipIntro, setWorld } from "./world3d.js?v=43";
-import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js?v=43";
+import { $, $$, audio, toast, NB } from "./core.js?v=44";
+import { initWorld, skipIntro, setWorld } from "./world3d.js?v=44";
+import { setScene, startLoop, hint, procedure, resetActive, setInspect, pointer } from "./labs.js?v=44";
 import {
   bindLearnUi, showLearn, showQuiz, showExam, showGlossary, renderProgress, learnDelta, showEthics, ethDelta
-} from "./ui.js?v=43";
+} from "./ui.js?v=44";
 
 const gl = document.getElementById("gl");
 const sim = document.getElementById("sim");
@@ -46,7 +46,7 @@ function enter(id) {
   $("#rail").hidden = false;
   $$("#rail button").forEach((b) => b.classList.toggle("on", b.dataset.go === id));
   const pal = { define: "intro", learn: "intro", scnt: "lab", dolly: "lab", plant: "greenhouse", bacteria: "bacteria", transgenic: "gene", ethics: "lab", exam: "lab", quiz: "lab", glossary: "intro", master: "lab" };
-  setWorld(pal[id] || "lab");
+  try { setWorld(pal[id] || "lab"); } catch {}
   setScene(id);
   startLoop();
   $("#learnPad").hidden = id !== "learn";

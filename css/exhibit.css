@@ -100,7 +100,9 @@ button:focus-visible, .opt:focus-visible, .gterm:focus-visible, textarea:focus-v
 #enter:hover { background: rgba(224,196,154,.18); }
 
 #hud { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
-#hud .top, #hud #status, #hud #dock { pointer-events: auto; }
+#hud .top, #hud #status { pointer-events: auto; }
+#hud #dock { pointer-events: none; }
+#hud #dock > * { pointer-events: auto; }
 .top {
   display: flex; justify-content: space-between; align-items: flex-start;
   padding: 18px 28px 16px 176px;
@@ -399,7 +401,8 @@ body[data-scene="ethics"] #sim { pointer-events: none; opacity: .18; }
 }
 #toast.warn { border-color: var(--warn); }
 #toast[hidden], #callout[hidden], #notebook[hidden], #hud[hidden], #rail[hidden], #enter[hidden],
-#learnPad[hidden], #quizPad[hidden], #examPad[hidden], #glossPad[hidden], #progPad[hidden], #ethicsPad[hidden] { display: none !important; }
+#learnPad[hidden], #quizPad[hidden], #examPad[hidden], #glossPad[hidden], #progPad[hidden], #ethicsPad[hidden],
+#dock[hidden] { display: none !important; }
 
 body[data-scene="intro"] #sim { pointer-events: none; opacity: 0; }
 body[data-scene="intro"] #vignette {

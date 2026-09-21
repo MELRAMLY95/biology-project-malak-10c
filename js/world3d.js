@@ -160,9 +160,10 @@ function onResize() {
 
 export function setWorld(name) {
   pal = palettes[name] || palettes.lab;
+  if (!scene || !renderer) return;
   scene.fog.color.setHex(pal.fog);
   renderer.setClearColor(pal.fog, 1);
-  cells.forEach((c) => { if (c.material) c.material.color.setHex(pal.cell); });
+  (cells || []).forEach((c) => { if (c.material) c.material.color.setHex(pal.cell); });
 }
 
 export function playIntro() {
@@ -174,6 +175,7 @@ export function playIntro() {
 
 export function skipIntro() {
   introPlaying = false;
+  if (!camera) return;
   camera.position.set(0, 0.2, 9);
 }
 
@@ -186,8 +188,13 @@ export function start() {
 export function stop() { running = false; }
 
 function loop() {
-  if (!running) return;
+  if (!running || !renderer || !scene || !camera) return;
   const dt = Math.min(0.033, clock.getDelta());
+  if (!cells || !points || !dna) {
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+    return;
+  }
   introT += dt;
   cells.forEach((c) => {
     if (!c.userData.hero) {
